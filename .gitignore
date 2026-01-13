@@ -1,0 +1,4 @@
+.env
+data/
+openApi_manual_v1.0.pdf
+.DS_Store
