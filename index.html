@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>대한민국 인구 이동 인포그래픽</title>
+    <link rel="icon" href="data:," />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,1,0"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page">
+
+      <main class="content">
+        <section class="map-shell map-shell--full">
+          <div class="top-row">
+            <div class="map-header glass-panel">
+              <h1>인구의 이동</h1>
+              <a
+                class="kosis-tag"
+                href="https://kosis.kr"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                KOSIS 데이터 기반
+              </a>
+            </div>
+            <div class="top-row__spacer" aria-hidden="true"></div>
+            <div class="panel panel-summary glass-panel">
+              <div class="stat-grid">
+                <div class="stat stat--total">
+                  <span class="stat__label" id="stat-total-label">총 이동 규모</span>
+                  <span class="stat__value" id="stat-total">-</span>
+                </div>
+                <div class="stat">
+                  <div class="age-control summary-age">
+                    <input type="range" class="control-range" id="age-range" min="0" max="17" value="0" />
+                    <span class="age-value" id="age-value">전체 연령</span>
+                  </div>
+                </div>
+                <div class="stat">
+                  <div class="year-control">
+                    <input type="range" class="control-range" id="year-range" min="1995" max="2025" value="2024" />
+                    <span class="summary-year-label" id="year-label">2024</span>
+                    <button type="button" class="play-toggle" id="play-toggle" aria-label="재생">
+                      <span class="material-symbols-rounded">play_arrow</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="map-stage">
+            <div class="map-card">
+            <div class="map-wrap">
+              <svg
+                id="flow-map"
+                viewBox="-40 0 980 780"
+                preserveAspectRatio="xMidYMid meet"
+                role="img"
+                aria-label="인구 이동 지도"
+              ></svg>
+              <div class="map-overlay" id="flow-overlay"></div>
+              <div class="flow-tooltip" id="flow-tooltip" role="status"></div>
+              <div class="map-tags">
+                <div class="map-tag-row map-tag-row--bottom">
+                  <div class="net-legend" id="net-legend"></div>
+                  <div class="map-tag-right">
+                    <span class="play-loading" id="play-loading" aria-hidden="true"></span>
+                    <span class="map-card__badge" id="badge-period">-</span>
+                  </div>
+                </div>
+              </div>
+              <div class="overlay-flows">
+                <div class="top-flows-title" id="sidebar-title">TOP3</div>
+                <section class="panel panel-flows glass-panel">
+                  <ol id="top-flows-list" class="top-flows-list"></ol>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div class="overlay-settings">
+            <button
+              type="button"
+              class="settings-toggle glass-panel"
+              id="settings-toggle"
+              aria-label="설정 열기"
+            >
+              <span class="material-symbols-rounded">settings</span>
+            </button>
+            <section class="panel panel-settings glass-panel is-collapsed" id="settings-panel">
+              <div class="panel__header">
+                <h2>설정</h2>
+              </div>
+              <div class="controls is-compact">
+                <label class="field field-sex">
+                  성별
+                  <select id="sex-select">
+                    <option value="0">전체</option>
+                    <option value="1">남자</option>
+                    <option value="2">여자</option>
+                  </select>
+                </label>
+                <label class="field field-item">
+                  지표
+                  <div class="select-with-info">
+                    <select id="item-select">
+                      <option value="T70">이동자수</option>
+                      <option value="T80" selected>순이동자수</option>
+                    </select>
+                    <button type="button" class="info-chip" id="indicator-info" aria-label="지표 설명">
+                      i
+                    </button>
+                    <div class="info-tooltip" id="indicator-tooltip" role="status"></div>
+                  </div>
+                </label>
+                <label class="field field-speed">
+                  재생 속도
+                  <div class="play-speed">
+                    <input type="range" id="play-speed" min="0.5" max="2" step="0.1" value="1" />
+                    <span class="summary-year-label" id="play-speed-label">1.0x</span>
+                  </div>
+                </label>
+              </div>
+              <div class="panel__footer">
+              </div>
+            </section>
+          </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>
+          <a href="https://github.com/Dobuzi/demographics" target="_blank" rel="noopener noreferrer">
+            © 2026 Made by Dobuzi
+          </a>
+        </p>
+      </footer>
+    </div>
+
+    <script src="geo/region_mapping.js"></script>
+    <script src="geo/flow_style.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
