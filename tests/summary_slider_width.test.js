@@ -13,7 +13,7 @@ assert.ok(
   "year slider should have fixed width"
 );
 assert.ok(
-  css.includes("@media (max-width: 640px)") && css.includes("flex: 0 0 90px"),
+  css.includes("@media (max-width: 640px)") && css.includes("flex: 0 0 80px"),
   "mobile sliders should use compact width"
 );
 assert.ok(
