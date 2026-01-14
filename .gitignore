@@ -2,3 +2,5 @@
 data/
 openApi_manual_v1.0.pdf
 .DS_Store
+kosis_all.json
+kosis_all.json.gz

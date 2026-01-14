@@ -23,6 +23,9 @@
 - GeoJSON: `assets/geo/korea_sido.geojson`
 - Office centers: `assets/geo/sido_office_centers.json`
 - Yearly downloads: `data/kosis_yearly/`
+- Hosted data: upload `kosis_all.json.gz` to a separate public data repo (e.g.,
+  `Dobuzi/demographics-data`) and keep `window.KOSIS_DATA_BASE_URL` pointing to
+  `https://raw.githubusercontent.com/<owner>/<repo>/main`.
 
 ## Roadmap
 1. Verify hover interactions and line/tooltips across datasets.

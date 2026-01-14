@@ -1,4 +1,6 @@
-const DATA_DIR = "data/kosis_yearly";
+const DATA_BASE_URL = window.KOSIS_DATA_BASE_URL || "";
+const MERGED_FILENAME = "kosis_all.json.gz";
+const DATA_DIR = DATA_BASE_URL ? `${DATA_BASE_URL}/kosis_yearly` : "data/kosis_yearly";
 const FLOW_MAP = document.getElementById("flow-map");
 const FLOW_OVERLAY = document.getElementById("flow-overlay");
 const YEAR_RANGE = document.getElementById("year-range");
@@ -311,6 +313,23 @@ function formatNumber(value) {
   return new Intl.NumberFormat("ko-KR").format(value);
 }
 
+async function fetchJson(url) {
+  const response = await fetch(url);
+  console.log("[fetchJson] fetch", url, response.status);
+  if (!response.ok) {
+    throw new Error(`데이터를 불러올 수 없습니다. (${response.status})`);
+  }
+  if (!url.endsWith(".gz")) {
+    return response.json();
+  }
+  if (typeof DecompressionStream === "undefined" || !response.body) {
+    throw new Error("브라우저에서 gzip 해제를 지원하지 않습니다.");
+  }
+  const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+  const text = await new Response(stream).text();
+  return JSON.parse(text);
+}
+
 async function loadMergedData() {
   if (mergedAttempted) return mergedPeriods;
   mergedAttempted = true;
@@ -320,11 +339,8 @@ async function loadMergedData() {
     return null;
   }
   try {
-    const baseDir = DATA_DIR.split("/").slice(0, -1).join("/") || ".";
-    const response = await fetch(`${baseDir}/kosis_all.json`);
-    console.log("[loadMergedData] fetch", response.status);
-    if (!response.ok) return null;
-    const payload = await response.json();
+    const baseDir = DATA_BASE_URL || DATA_DIR.split("/").slice(0, -1).join("/") || ".";
+    const payload = await fetchJson(`${baseDir}/${MERGED_FILENAME}`);
     console.log("[loadMergedData] payload keys", Object.keys(payload || {}));
     mergedPeriods = payload.periods || null;
     return mergedPeriods;
@@ -840,12 +856,8 @@ async function loadData(year, month) {
   }
   const filename = month ? `kosis_${year}${month}.json` : `kosis_${year}.json`;
   const url = `${DATA_DIR}/${filename}`;
-  const response = await fetch(url);
-  console.log("[loadData] fetch", url, response.status);
-  if (!response.ok) {
-    throw new Error(`${year} 데이터를 불러올 수 없습니다.`);
-  }
-  const data = await response.json();
+  const data = await fetchJson(url);
+  console.log("[loadData] fetch", url);
   console.log("[loadData] rows", data.length || 0);
   setCacheEntry(key, data);
   return data;
