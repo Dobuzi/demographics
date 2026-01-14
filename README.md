@@ -5,7 +5,7 @@
 - Single combined map shows flow lines plus net inflow/outflow fill on the same SVG.
 - UI includes controls, summary stats, top flows, and legends in a no-scroll layout.
 
-![Demo](assets/demo.gif)
+<img src="assets/demo.gif" alt="Demo" width="360" />
 
 [Live Demo](https://dobuzi.github.io/demographics/)
 
