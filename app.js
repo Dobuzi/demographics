@@ -1,11 +1,24 @@
+/* ─── Configuration ─── */
 const DATA_BASE_URL = window.KOSIS_DATA_BASE_URL || "";
 const MERGED_FILENAME = "kosis_all.json.gz";
 const DATA_DIR = DATA_BASE_URL ? `${DATA_BASE_URL}/kosis_yearly` : "data/kosis_yearly";
+const GEOJSON_PATH = "assets/geo/korea_sido.geojson";
+const OFFICE_CENTERS_PATH = "assets/geo/sido_office_centers.json";
+const DEFAULT_MONTH = "11";
+const FAR_EAST_LON = 130.0;
+const FAR_EAST_COMPRESS = 0.25;
+const PLAY_INTERVAL_YEAR_MS = 1000;
+const PLAY_INTERVAL_MONTH_MS = 700;
+const MAX_CACHE_ENTRIES = 12;
+const TOP_FLOW_COUNT = 3;
+const FETCH_MAX_RETRIES = 3;
+const FETCH_BASE_DELAY_MS = 1000;
+
+/* ─── DOM References ─── */
 const FLOW_MAP = document.getElementById("flow-map");
 const FLOW_OVERLAY = document.getElementById("flow-overlay");
 const YEAR_RANGE = document.getElementById("year-range");
 const YEAR_LABEL = document.getElementById("year-label");
-const DEFAULT_MONTH = "11";
 const AGE_RANGE = document.getElementById("age-range");
 const AGE_VALUE = document.getElementById("age-value");
 const SEX_SELECT = document.getElementById("sex-select");
@@ -28,36 +41,11 @@ const PLAY_SPEED = document.getElementById("play-speed");
 const PLAY_SPEED_LABEL = document.getElementById("play-speed-label");
 const TOP_LIST = document.getElementById("top-flows-list");
 const SIDEBAR_TITLE = document.getElementById("sidebar-title");
-const FAR_EAST_LON = 130.0;
-const FAR_EAST_COMPRESS = 0.25;
-const PLAY_INTERVAL_YEAR_MS = 1000;
-const PLAY_INTERVAL_MONTH_MS = 700;
-const MAX_CACHE_ENTRIES = 12;
-const TOP_FLOW_COUNT = 3;
+const ERROR_BANNER = document.getElementById("error-banner");
+const ERROR_MESSAGE = document.getElementById("error-message");
+const ERROR_RETRY = document.getElementById("error-retry");
 
-const AGE_GROUPS = [
-  { code: "000", label: "전체" },
-  { code: "020", label: "0-4세" },
-  { code: "050", label: "5-9세" },
-  { code: "070", label: "10-14세" },
-  { code: "100", label: "15-19세" },
-  { code: "120", label: "20-24세" },
-  { code: "130", label: "25-29세" },
-  { code: "150", label: "30-34세" },
-  { code: "160", label: "35-39세" },
-  { code: "180", label: "40-44세" },
-  { code: "190", label: "45-49세" },
-  { code: "210", label: "50-54세" },
-  { code: "230", label: "55-59세" },
-  { code: "260", label: "60-64세" },
-  { code: "280", label: "65-69세" },
-  { code: "310", label: "70-74세" },
-  { code: "330", label: "75-79세" },
-  { code: "340", label: "80세 이상" },
-];
-
-const GEOJSON_PATH = "assets/geo/korea_sido.geojson";
-const OFFICE_CENTERS_PATH = "assets/geo/sido_office_centers.json";
+/* ─── Module Imports ─── */
 const { normalizeSidoName, mapSidoNameToCode } = window.regionMapping || {};
 const {
   buildGradientStops,
@@ -76,41 +64,40 @@ const {
   getNetFillEnabled,
   getNetLegendItems,
   shouldUseMergedData,
-} =
-  window.flowStyle || {};
+} = window.flowStyle || {};
 
+const {
+  AGE_GROUPS,
+  validateDataset,
+  parseDT,
+  buildCacheKey,
+  buildTimeline,
+  getPlaybackInterval: computePlaybackInterval,
+  getPrefetchCount: computePrefetchCount,
+  getAgeIndex,
+  formatNumber,
+} = window.dataUtils || {};
+
+const {
+  buildFlows: computeFlows,
+  buildNet: computeNet,
+} = window.dataProcessing || {};
+
+/* ─── State ─── */
 const cache = new Map();
 const cacheOrder = [];
 let mergedPeriods = null;
 let mergedAttempted = false;
 let geoIndex = null;
 let officeCenters = null;
+let refreshAbortController = null;
 let playState = {
   isPlaying: false,
   timer: null,
   loopId: 0,
 };
 
-function getAgeIndex(value) {
-  const index = Number(value);
-  if (!Number.isFinite(index)) return 0;
-  return Math.min(Math.max(index, 0), AGE_GROUPS.length - 1);
-}
-
-function syncAgeLabel(index) {
-  const age = AGE_GROUPS[index];
-  if (!AGE_VALUE || !age) return;
-  AGE_VALUE.textContent = age.label;
-}
-
-function toggleAgeAll() {
-  if (!AGE_RANGE) return;
-  AGE_RANGE.disabled = false;
-}
-
-function setOverlayBlocked(isBlocked) {
-  document.body.classList.toggle("settings-open", isBlocked);
-}
+/* ─── Cache ─── */
 
 function setCacheEntry(key, data) {
   if (cache.has(key)) {
@@ -127,30 +114,62 @@ function setCacheEntry(key, data) {
   }
 }
 
-function buildTimeline() {
-  const timeline = [];
-  for (let year = 1995; year <= 2024; year += 1) {
-    timeline.push({ year, month: null });
-  }
-  for (let month = 1; month <= 11; month += 1) {
-    timeline.push({ year: 2025, month: String(month).padStart(2, "0") });
-  }
-  return timeline;
+/* ─── UI Helpers ─── */
+
+function syncAgeLabel(index) {
+  const age = AGE_GROUPS[index];
+  if (!AGE_VALUE || !age) return;
+  AGE_VALUE.textContent = age.label;
 }
+
+function toggleAgeAll() {
+  if (!AGE_RANGE) return;
+  AGE_RANGE.disabled = false;
+}
+
+function setOverlayBlocked(isBlocked) {
+  document.body.classList.toggle("settings-open", isBlocked);
+}
+
+function setLoading(target, isLoading) {
+  if (!target) return;
+  target.classList.toggle("is-active", isLoading);
+}
+
+function showError(message) {
+  if (ERROR_BANNER && ERROR_MESSAGE) {
+    ERROR_MESSAGE.textContent = message;
+    ERROR_BANNER.classList.add("is-active");
+    ERROR_BANNER.setAttribute("role", "alert");
+  }
+  if (FLOW_OVERLAY) {
+    FLOW_OVERLAY.textContent = message;
+    FLOW_OVERLAY.classList.add("is-active");
+  }
+}
+
+function hideError() {
+  if (ERROR_BANNER) {
+    ERROR_BANNER.classList.remove("is-active");
+  }
+  if (FLOW_OVERLAY) {
+    FLOW_OVERLAY.classList.remove("is-active");
+    FLOW_OVERLAY.textContent = "";
+  }
+}
+
+/* ─── Playback ─── */
 
 function getPlaybackInterval(period) {
   const speed = PLAY_SPEED ? Number(PLAY_SPEED.value) || 1 : 1;
-  const base = period && period.year === 2025 ? PLAY_INTERVAL_MONTH_MS : PLAY_INTERVAL_YEAR_MS;
-  return Math.max(300, Math.round(base / speed));
+  return computePlaybackInterval
+    ? computePlaybackInterval(period, speed, PLAY_INTERVAL_YEAR_MS, PLAY_INTERVAL_MONTH_MS)
+    : Math.max(300, Math.round((period && period.month ? PLAY_INTERVAL_MONTH_MS : PLAY_INTERVAL_YEAR_MS) / speed));
 }
 
 function getPrefetchCount() {
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (connection?.saveData) return 1;
-  const downlink = connection?.downlink || 0;
-  if (downlink && downlink < 2) return 1;
-  if (downlink && downlink > 5) return 4;
-  return 3;
+  return computePrefetchCount ? computePrefetchCount(connection) : 3;
 }
 
 function setPeriod({ year, month }) {
@@ -169,11 +188,13 @@ function togglePlayback() {
     playState.loopId += 1;
     PLAY_TOGGLE.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
     PLAY_TOGGLE.classList.remove("is-playing");
+    PLAY_TOGGLE.setAttribute("aria-label", "재생");
     return;
   }
   playState.isPlaying = true;
   PLAY_TOGGLE.innerHTML = '<span class="material-symbols-rounded">pause</span>';
   PLAY_TOGGLE.classList.add("is-playing");
+  PLAY_TOGGLE.setAttribute("aria-label", "일시정지");
   if (FLOW_TOOLTIP) {
     FLOW_TOOLTIP.classList.remove("is-active");
   }
@@ -181,10 +202,10 @@ function togglePlayback() {
 }
 
 async function runPlaybackLoop() {
-  const timeline = buildTimeline();
+  const timeline = buildTimeline ? buildTimeline() : [];
   let index = timeline.findIndex((entry) => {
     const year = Number(YEAR_RANGE.value);
-  const month = year === 2025 ? DEFAULT_MONTH : null;
+    const month = year === 2025 ? DEFAULT_MONTH : null;
     return entry.year === year && entry.month === month;
   });
   if (index < 0) index = 0;
@@ -206,7 +227,7 @@ async function runPlaybackLoop() {
 }
 
 async function prefetchPeriod({ year, month }) {
-  const key = `${year}${month || ""}`;
+  const key = buildCacheKey ? buildCacheKey(year, month) : `${year}${month || ""}`;
   if (cache.has(key)) return;
   try {
     await loadData(year, month);
@@ -215,14 +236,11 @@ async function prefetchPeriod({ year, month }) {
   }
 }
 
+/* ─── Settings Panel ─── */
+
 function initSettingsToggle() {
   if (!SETTINGS_TOGGLE || !SETTINGS_PANEL) return;
-  console.log("[settings] init", {
-    toggle: SETTINGS_TOGGLE,
-    panel: SETTINGS_PANEL,
-    html: SETTINGS_TOGGLE.innerHTML,
-    text: SETTINGS_TOGGLE.textContent,
-  });
+  console.log("[settings] init");
   const ensureSettingsIcon = () => {
     let icon = SETTINGS_TOGGLE.querySelector(".material-symbols-rounded");
     if (!icon) {
@@ -232,55 +250,27 @@ function initSettingsToggle() {
       SETTINGS_TOGGLE.appendChild(icon);
     }
     icon.textContent = "settings";
-    console.log("[settings] ensure icon", {
-      html: SETTINGS_TOGGLE.innerHTML,
-      text: SETTINGS_TOGGLE.textContent,
-    });
   };
   ensureSettingsIcon();
   SETTINGS_TOGGLE.setAttribute("aria-expanded", "false");
   SETTINGS_TOGGLE.setAttribute("aria-label", "설정 열기");
+  SETTINGS_TOGGLE.setAttribute("aria-controls", "settings-panel");
   const closeSettings = () => {
-    console.log("[settings] close start", {
-      expanded: SETTINGS_TOGGLE.getAttribute("aria-expanded"),
-      html: SETTINGS_TOGGLE.innerHTML,
-      text: SETTINGS_TOGGLE.textContent,
-    });
     SETTINGS_PANEL.classList.add("is-collapsed");
     SETTINGS_TOGGLE.setAttribute("aria-expanded", "false");
     SETTINGS_TOGGLE.setAttribute("aria-label", "설정 열기");
     ensureSettingsIcon();
     setOverlayBlocked(false);
-    console.log("[settings] close done", {
-      expanded: SETTINGS_TOGGLE.getAttribute("aria-expanded"),
-      html: SETTINGS_TOGGLE.innerHTML,
-      text: SETTINGS_TOGGLE.textContent,
-    });
   };
   const openSettings = () => {
-    console.log("[settings] open start", {
-      expanded: SETTINGS_TOGGLE.getAttribute("aria-expanded"),
-      html: SETTINGS_TOGGLE.innerHTML,
-      text: SETTINGS_TOGGLE.textContent,
-    });
     SETTINGS_PANEL.classList.remove("is-collapsed");
     SETTINGS_TOGGLE.setAttribute("aria-expanded", "true");
     SETTINGS_TOGGLE.setAttribute("aria-label", "설정 닫기");
     ensureSettingsIcon();
     setOverlayBlocked(true);
-    console.log("[settings] open done", {
-      expanded: SETTINGS_TOGGLE.getAttribute("aria-expanded"),
-      html: SETTINGS_TOGGLE.innerHTML,
-      text: SETTINGS_TOGGLE.textContent,
-    });
   };
   SETTINGS_TOGGLE.addEventListener("click", () => {
     const isCollapsed = SETTINGS_PANEL.classList.contains("is-collapsed");
-    console.log("[settings] toggle click", {
-      isCollapsed,
-      html: SETTINGS_TOGGLE.innerHTML,
-      text: SETTINGS_TOGGLE.textContent,
-    });
     if (isCollapsed) {
       openSettings();
     } else {
@@ -304,33 +294,60 @@ function initSettingsToggle() {
   });
 }
 
-function setLoading(target, isLoading) {
-  if (!target) return;
-  target.classList.toggle("is-active", isLoading);
+/* ─── Data Loading ─── */
+
+/**
+ * Fetch JSON from a URL with retry logic and exponential backoff.
+ * Supports gzip-compressed files via DecompressionStream.
+ * @param {string} url
+ * @param {object} [options]
+ * @param {AbortSignal} [options.signal]
+ * @returns {Promise<any>}
+ */
+async function fetchJson(url, options) {
+  const signal = options && options.signal;
+  let lastError;
+  for (let attempt = 0; attempt <= FETCH_MAX_RETRIES; attempt++) {
+    if (signal && signal.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    try {
+      const response = await fetch(url, signal ? { signal } : undefined);
+      console.log("[fetchJson] fetch", url, response.status);
+      if (!response.ok) {
+        throw new Error(`데이터를 불러올 수 없습니다. (${response.status})`);
+      }
+      if (!url.endsWith(".gz")) {
+        return response.json();
+      }
+      if (typeof DecompressionStream === "undefined" || !response.body) {
+        throw new Error("브라우저에서 gzip 해제를 지원하지 않습니다.");
+      }
+      const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+      const text = await new Response(stream).text();
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error("데이터 형식이 올바르지 않습니다. (JSON 파싱 실패)");
+      }
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      if (error.name === "AbortError") throw error;
+      /* Do not retry client errors (4xx) */
+      if (error.message && error.message.includes("(4")) throw error;
+      if (attempt < FETCH_MAX_RETRIES) {
+        const delay = FETCH_BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn("[fetchJson] retry", attempt + 1, "after", delay, "ms");
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
 }
 
-function formatNumber(value) {
-  return new Intl.NumberFormat("ko-KR").format(value);
-}
-
-async function fetchJson(url) {
-  const response = await fetch(url);
-  console.log("[fetchJson] fetch", url, response.status);
-  if (!response.ok) {
-    throw new Error(`데이터를 불러올 수 없습니다. (${response.status})`);
-  }
-  if (!url.endsWith(".gz")) {
-    return response.json();
-  }
-  if (typeof DecompressionStream === "undefined" || !response.body) {
-    throw new Error("브라우저에서 gzip 해제를 지원하지 않습니다.");
-  }
-  const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
-  const text = await new Response(stream).text();
-  return JSON.parse(text);
-}
-
-async function loadMergedData() {
+async function loadMergedData(signal) {
   if (mergedAttempted) return mergedPeriods;
   mergedAttempted = true;
   console.log("[loadMergedData] start");
@@ -340,11 +357,12 @@ async function loadMergedData() {
   }
   try {
     const baseDir = DATA_BASE_URL || DATA_DIR.split("/").slice(0, -1).join("/") || ".";
-    const payload = await fetchJson(`${baseDir}/${MERGED_FILENAME}`);
+    const payload = await fetchJson(`${baseDir}/${MERGED_FILENAME}`, { signal });
     console.log("[loadMergedData] payload keys", Object.keys(payload || {}));
     mergedPeriods = payload.periods || null;
     return mergedPeriods;
   } catch (error) {
+    if (error.name === "AbortError") throw error;
     console.error("[loadMergedData] error", error);
     return null;
   }
@@ -386,6 +404,40 @@ async function loadGeoJson() {
   geoIndex = buildRegionIndex(geojson, 900, 780, centers);
   return geoIndex;
 }
+
+async function loadData(year, month, signal) {
+  console.log("[loadData] start", { year, month });
+  const key = buildCacheKey ? buildCacheKey(year, month) : `${year}${month || ""}`;
+  if (cache.has(key)) return cache.get(key);
+  const merged = await loadMergedData(signal);
+  if (merged && merged[key]) {
+    console.log("[loadData] merged hit", key, merged[key].length);
+    const rows = merged[key];
+    if (validateDataset) {
+      const check = validateDataset(rows);
+      if (!check.valid) {
+        console.warn("[loadData] validation failed for merged key", key, check.reason);
+      }
+    }
+    setCacheEntry(key, rows);
+    return rows;
+  }
+  const filename = month ? `kosis_${year}${month}.json` : `kosis_${year}.json`;
+  const url = `${DATA_DIR}/${filename}`;
+  const data = await fetchJson(url, { signal });
+  console.log("[loadData] fetch", url);
+  console.log("[loadData] rows", data.length || 0);
+  if (validateDataset) {
+    const check = validateDataset(data);
+    if (!check.valid) {
+      throw new Error(`데이터 검증 실패: ${check.reason}`);
+    }
+  }
+  setCacheEntry(key, data);
+  return data;
+}
+
+/* ─── Geo / Projection ─── */
 
 function collectCoords(geometry, handler) {
   if (geometry.type === "Polygon") {
@@ -495,6 +547,69 @@ function buildRegionIndex(geojson, width, height, centers) {
   return { regions, byCode };
 }
 
+/* ─── Data Processing (delegates to module) ─── */
+
+function buildFlows(data, options, regionIndex) {
+  if (computeFlows) {
+    return computeFlows(data, options, regionIndex.byCode);
+  }
+  /* Inline fallback (keeps tests happy if module not loaded) */
+  const totals = new Map();
+  let sum = 0;
+  data.forEach((row) => {
+    if (row.ITM_ID !== options.item) return;
+    if (row.C3 !== options.sex) return;
+    if (row.C4 !== options.age) return;
+    if (row.C1 === "00" || row.C2 === "00") return;
+    if (shouldRenderPair ? !shouldRenderPair(row.C1, row.C2) : row.C1 === row.C2) return;
+    if (!regionIndex.byCode.has(row.C1) || !regionIndex.byCode.has(row.C2)) return;
+    const value = parseDT ? parseDT(row.DT) : (Number(String(row.DT).replace(/,/g, "")) || 0);
+    if (shouldRenderFlow ? !shouldRenderFlow(value) : value <= 0) return;
+    const key = `${row.C1}-${row.C2}`;
+    totals.set(key, (totals.get(key) || 0) + value);
+    sum += value;
+  });
+  const flows = Array.from(totals.entries())
+    .map(([key, value]) => {
+      const [fromCode, toCode] = key.split("-");
+      const from = regionIndex.byCode.get(fromCode);
+      const to = regionIndex.byCode.get(toCode);
+      if (!from || !to || !from.name || !to.name) return null;
+      return { value, from, to, fromCode, toCode, label: `${from.name} → ${to.name}` };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.value - a.value);
+  return { flows, total: sum };
+}
+
+function buildNet(data, options, regionIndex) {
+  if (computeNet) {
+    return computeNet(data, options, regionIndex.byCode);
+  }
+  /* Inline fallback */
+  const net = new Map();
+  let total = 0;
+  data.forEach((row) => {
+    if (row.ITM_ID !== options.item) return;
+    if (row.C3 !== options.sex) return;
+    if (row.C4 !== options.age) return;
+    if (row.C1 === "00" || row.C2 === "00") return;
+    if (!regionIndex.byCode.has(row.C1) || !regionIndex.byCode.has(row.C2)) return;
+    const value = parseDT ? parseDT(row.DT) : (Number(String(row.DT).replace(/,/g, "")) || 0);
+    if (!value) return;
+    net.set(row.C1, (net.get(row.C1) || 0) - value);
+    net.set(row.C2, (net.get(row.C2) || 0) + value);
+    total += value;
+  });
+  const entries = Array.from(net.entries()).map(([code, value]) => ({
+    code, value, region: regionIndex.byCode.get(code),
+  }));
+  entries.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  return { entries, total };
+}
+
+/* ─── SVG Rendering ─── */
+
 function drawBaseMap(svg, regions, mode, netValues, height) {
   const width = 900;
   svg.innerHTML = "";
@@ -581,10 +696,17 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
   svg.appendChild(dotGroup);
 }
 
+/**
+ * Generate a quadratic Bezier SVG path between two points.
+ * Guards against NaN when source and target overlap (distance = 0).
+ */
 function flowPath(source, target) {
   const dx = target.x - source.x;
   const dy = target.y - source.y;
   const distance = Math.hypot(dx, dy);
+  if (distance < 0.01) {
+    return `M ${source.x} ${source.y} L ${target.x} ${target.y}`;
+  }
   const curve = Math.min(120, distance * 0.35);
   const midX = (source.x + target.x) / 2;
   const midY = (source.y + target.y) / 2;
@@ -645,8 +767,8 @@ function drawFlows(flows, regions, pulseCount, netValues) {
       stopEl.setAttribute("stop-opacity", stop.opacity);
       gradient.appendChild(stopEl);
     });
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
+    const anim_dx = target.x - source.x;
+    const anim_dy = target.y - source.y;
     const animation = flowGradientAnimation
       ? flowGradientAnimation(flow.value, maxValue)
       : null;
@@ -654,7 +776,7 @@ function drawFlows(flows, regions, pulseCount, netValues) {
       const anim = document.createElementNS("http://www.w3.org/2000/svg", "animateTransform");
       anim.setAttribute("attributeName", "gradientTransform");
       anim.setAttribute("type", "translate");
-      anim.setAttribute("values", `0 0; ${dx * 0.2} ${dy * 0.2}; 0 0`);
+      anim.setAttribute("values", `0 0; ${anim_dx * 0.2} ${anim_dy * 0.2}; 0 0`);
       anim.setAttribute("dur", `${animation.duration}s`);
       anim.setAttribute("repeatCount", "indefinite");
       gradient.appendChild(anim);
@@ -665,8 +787,9 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     const widthScale = flowWidthScale
       ? flowWidthScale(flow.value, maxValue)
       : 2.2 + (flow.value / maxValue) * 7.3;
+    const pathD = flowPath(source, target);
     const pathGlow = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    pathGlow.setAttribute("d", flowPath(source, target));
+    pathGlow.setAttribute("d", pathD);
     pathGlow.setAttribute("stroke-width", widthScale + 2.5);
     pathGlow.setAttribute("stroke", "rgba(120, 255, 200, 0.25)");
     pathGlow.setAttribute("fill", "none");
@@ -678,7 +801,7 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     flowGroup.appendChild(pathGlow);
 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", flowPath(source, target));
+    path.setAttribute("d", pathD);
     path.setAttribute("stroke-width", widthScale);
     path.setAttribute("stroke", `url(#${gradientId})`);
     path.setAttribute("fill", "none");
@@ -743,10 +866,14 @@ function drawFlows(flows, regions, pulseCount, netValues) {
   FLOW_MAP.appendChild(flowGroup);
 }
 
+/* ─── UI Updates ─── */
+
 function updateTopList(flows) {
   if (!TOP_LIST) return;
   TOP_LIST.innerHTML = "";
-  SIDEBAR_TITLE.textContent = "TOP3";
+  if (SIDEBAR_TITLE) {
+    SIDEBAR_TITLE.textContent = "TOP3";
+  }
   const topFlows = flows.slice(0, TOP_FLOW_COUNT);
   topFlows.forEach((flow) => {
     const item = document.createElement("li");
@@ -763,76 +890,6 @@ function updateTopList(flows) {
   });
 }
 
-function buildFlows(data, options, regionIndex) {
-  const totals = new Map();
-  let sum = 0;
-
-  data.forEach((row) => {
-    if (row.ITM_ID !== options.item) return;
-    if (row.C3 !== options.sex) return;
-    if (row.C4 !== options.age) return;
-    if (row.C1 === "00" || row.C2 === "00") return;
-    if (shouldRenderPair ? !shouldRenderPair(row.C1, row.C2) : row.C1 === row.C2) return;
-    if (!regionIndex.byCode.has(row.C1) || !regionIndex.byCode.has(row.C2)) return;
-
-    const value = Number(row.DT.replace(/,/g, "")) || 0;
-    if (shouldRenderFlow ? !shouldRenderFlow(value) : value <= 0) return;
-    const key = `${row.C1}-${row.C2}`;
-    totals.set(key, (totals.get(key) || 0) + value);
-    sum += value;
-  });
-
-  const flows = Array.from(totals.entries())
-    .map(([key, value]) => {
-      const [fromCode, toCode] = key.split("-");
-      const from = regionIndex.byCode.get(fromCode);
-      const to = regionIndex.byCode.get(toCode);
-      if (!from || !to || !from.name || !to.name) {
-        return null;
-      }
-      return {
-        value,
-        from,
-        to,
-        fromCode,
-        toCode,
-        label: `${from.name} → ${to.name}`,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.value - a.value);
-
-  return { flows, total: sum };
-}
-
-function buildNet(data, options, regionIndex) {
-  const net = new Map();
-  let total = 0;
-
-  data.forEach((row) => {
-    if (row.ITM_ID !== options.item) return;
-    if (row.C3 !== options.sex) return;
-    if (row.C4 !== options.age) return;
-    if (row.C1 === "00" || row.C2 === "00") return;
-    if (!regionIndex.byCode.has(row.C1) || !regionIndex.byCode.has(row.C2)) return;
-
-    const value = Number(row.DT.replace(/,/g, "")) || 0;
-    if (!value) return;
-    net.set(row.C1, (net.get(row.C1) || 0) - value);
-    net.set(row.C2, (net.get(row.C2) || 0) + value);
-    total += value;
-  });
-
-  const entries = Array.from(net.entries()).map(([code, value]) => ({
-    code,
-    value,
-    region: regionIndex.byCode.get(code),
-  }));
-  entries.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-
-  return { entries, total };
-}
-
 function renderNetLegend() {
   if (!NET_LEGEND || !getNetLegendItems) return;
   const items = getNetLegendItems();
@@ -842,25 +899,6 @@ function renderNetLegend() {
         `<span class="net-legend__item"><span class="net-legend__swatch" style="background:${item.color};"></span>${item.label}</span>`
     )
     .join("");
-}
-
-async function loadData(year, month) {
-  console.log("[loadData] start", { year, month });
-  const key = `${year}${month || ""}`;
-  if (cache.has(key)) return cache.get(key);
-  const merged = await loadMergedData();
-  if (merged && merged[key]) {
-    console.log("[loadData] merged hit", key, merged[key].length);
-    setCacheEntry(key, merged[key]);
-    return merged[key];
-  }
-  const filename = month ? `kosis_${year}${month}.json` : `kosis_${year}.json`;
-  const url = `${DATA_DIR}/${filename}`;
-  const data = await fetchJson(url);
-  console.log("[loadData] fetch", url);
-  console.log("[loadData] rows", data.length || 0);
-  setCacheEntry(key, data);
-  return data;
 }
 
 function syncLabels(year, ageCode, total, month, totalLabel) {
@@ -882,12 +920,22 @@ function syncLabels(year, ageCode, total, month, totalLabel) {
   }
 }
 
+/* ─── Main Refresh ─── */
+
 async function refresh() {
   console.log("[refresh] start");
+
+  /* Cancel any in-flight refresh */
+  if (refreshAbortController) {
+    refreshAbortController.abort();
+  }
+  refreshAbortController = new AbortController();
+  const signal = refreshAbortController.signal;
+
   const year = Number(YEAR_RANGE.value);
   const isMonthly = year === 2025;
   const month = isMonthly ? DEFAULT_MONTH : null;
-  const ageIndex = getAgeIndex(AGE_RANGE.value);
+  const ageIndex = getAgeIndex ? getAgeIndex(AGE_RANGE.value) : 0;
   const useAllAge = false;
   const options = {
     sex: SEX_SELECT.value,
@@ -896,13 +944,12 @@ async function refresh() {
   };
 
   setLoading(PLAY_LOADING, true);
-  if (FLOW_OVERLAY) {
-    FLOW_OVERLAY.classList.remove("is-active");
-    FLOW_OVERLAY.textContent = "";
-  }
+  hideError();
   try {
     const regionIndex = await loadGeoJson();
-    const data = await loadData(year, month);
+    if (signal.aborted) return;
+    const data = await loadData(year, month, signal);
+    if (signal.aborted) return;
     console.log("[refresh] data loaded", data.length);
     if (LEGEND_LINE_LABEL) {
       LEGEND_LINE_LABEL.textContent = "이동 규모 (선 두께)";
@@ -920,16 +967,19 @@ async function refresh() {
     syncLabels(year, options.age, total, month, "총 이동 규모");
     renderNetLegend();
   } catch (error) {
+    if (error.name === "AbortError") {
+      console.log("[refresh] aborted");
+      return;
+    }
     console.error("[refresh] error", error);
     FLOW_MAP.innerHTML = "";
-    if (FLOW_OVERLAY) {
-      FLOW_OVERLAY.textContent = error.message;
-      FLOW_OVERLAY.classList.add("is-active");
-    }
+    showError(error.message);
   } finally {
     setLoading(PLAY_LOADING, false);
   }
 }
+
+/* ─── Control Bindings ─── */
 
 function bindControls() {
   YEAR_RANGE.addEventListener("input", () => {
@@ -937,7 +987,7 @@ function bindControls() {
   });
   YEAR_RANGE.addEventListener("change", refresh);
   AGE_RANGE.addEventListener("input", () => {
-    syncAgeLabel(getAgeIndex(AGE_RANGE.value));
+    syncAgeLabel(getAgeIndex ? getAgeIndex(AGE_RANGE.value) : 0);
   });
   AGE_RANGE.addEventListener("change", refresh);
   if (PLAY_TOGGLE) {
@@ -995,7 +1045,19 @@ function bindControls() {
   attachInfo(INDICATOR_INFO, INDICATOR_TOOLTIP, () => {
     return getIndicatorInfo ? getIndicatorInfo(ITEM_SELECT.value) : null;
   });
+
+  /* Retry button */
+  if (ERROR_RETRY) {
+    ERROR_RETRY.addEventListener("click", () => {
+      hideError();
+      mergedAttempted = false;
+      mergedPeriods = null;
+      refresh();
+    });
+  }
 }
+
+/* ─── Init ─── */
 
 function init() {
   console.log("[init] start");

@@ -1175,3 +1175,82 @@ select {
 .stat-grid .stat--total .stat__label {
   white-space: nowrap;
 }
+
+/* ─── Error Banner ─── */
+
+.error-banner {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: rgba(240, 91, 76, 0.92);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 20;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  max-width: 90%;
+}
+
+.error-banner.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.error-banner__retry {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.error-banner__retry:hover,
+.error-banner__retry:focus-visible {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ─── Focus Visible ─── */
+
+:focus-visible {
+  outline: 2px solid rgba(39, 209, 127, 0.7);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+select:focus-visible,
+input[type="range"]:focus-visible {
+  outline: 2px solid rgba(39, 209, 127, 0.7);
+  outline-offset: 2px;
+}
+
+/* ─── Reduced Motion ─── */
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-line,
+  .flow-line--pulse,
+  .flow-line--glow,
+  .region-shape,
+  .play-loading {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .map-overlay,
+  .flow-tooltip,
+  .info-tooltip,
+  .error-banner {
+    transition: none !important;
+  }
+}
