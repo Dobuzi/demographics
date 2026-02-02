@@ -17,6 +17,7 @@ Guide for AI assistants working on this repository.
 index.html          Main HTML entry point
 app.js              Application controller (~1,000 lines) — data loading, SVG rendering, controls, playback
 styles.css          All styles (~1,200 lines) — CSS variables, dark theme, responsive layout
+sw.js               Service Worker: offline caching of static assets and recent KOSIS data
 
 geo/
   region_mapping.js   UMD module: region name normalization and Sido code mapping (17 regions)
@@ -34,7 +35,7 @@ scripts/
   merge_kosis_data.py       Merge yearly files into single JSON
 
 tests/
-  *.test.js           43 test files using Node.js assert module (no test runner)
+  *.test.js           45 test files using Node.js assert module (no test runner)
 
 .github/workflows/
   pages.yml           GitHub Actions: deploy to GitHub Pages on push to main
@@ -88,6 +89,7 @@ User interaction -> DOM event -> refresh() -> loadData(year) -> buildFlows() -> 
 - **Net fill**: Region polygons colored by net inflow (green `#27d17f`) / outflow (red `#f05b4c`)
 - **Error handling**: `fetchJson()` retries with exponential backoff (`FETCH_MAX_RETRIES = 3`); errors shown via `#error-banner` with retry button
 - **Abort on rapid changes**: Each `refresh()` call creates a new `AbortController`, aborting any in-flight fetch from the previous call
+- **Service Worker**: `sw.js` caches static assets (cache-first) and KOSIS data (network-first, max 5 entries) for offline viewing; registered in `index.html`
 
 ### Module pattern
 All `geo/*.js` modules use UMD wrappers:
