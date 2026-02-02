@@ -17,10 +17,13 @@ Guide for AI assistants working on this repository.
 index.html          Main HTML entry point
 app.js              Application controller (~1,000 lines) — data loading, SVG rendering, controls, playback
 styles.css          All styles (~1,200 lines) — CSS variables, dark theme, responsive layout
+sw.js               Service Worker: offline caching of static assets and recent KOSIS data
 
 geo/
-  region_mapping.js UMD module: region name normalization and Sido code mapping (17 regions)
-  flow_style.js     UMD module: flow colors, width scaling, display counts, label formatting
+  region_mapping.js   UMD module: region name normalization and Sido code mapping (17 regions)
+  flow_style.js       UMD module: flow colors, width scaling, display counts, label formatting
+  data_utils.js       UMD module: data validation, timeline, cache keys, formatting helpers
+  data_processing.js  UMD module: buildFlows() and buildNet() — extracted from app.js
 
 assets/geo/
   korea_sido.geojson    GeoJSON boundaries for 17 regions
@@ -32,10 +35,11 @@ scripts/
   merge_kosis_data.py       Merge yearly files into single JSON
 
 tests/
-  *.test.js           38 test files using Node.js assert module (no test runner)
+  *.test.js           45 test files using Node.js assert module (no test runner)
 
 .github/workflows/
   pages.yml           GitHub Actions: deploy to GitHub Pages on push to main
+  test.yml            GitHub Actions: run all tests on push/PR to main
 ```
 
 ### Gitignored paths
@@ -83,13 +87,18 @@ User interaction -> DOM event -> refresh() -> loadData(year) -> buildFlows() -> 
 - **Playback**: `togglePlayback()` / `runPlaybackLoop()` iterate through a timeline (years 1995-2024, then months in 2025)
 - **SVG rendering**: Quadratic Bezier curves (`flowPath()`) between region centroids, with gradients and pulse animations
 - **Net fill**: Region polygons colored by net inflow (green `#27d17f`) / outflow (red `#f05b4c`)
+- **Error handling**: `fetchJson()` retries with exponential backoff (`FETCH_MAX_RETRIES = 3`); errors shown via `#error-banner` with retry button
+- **Abort on rapid changes**: Each `refresh()` call creates a new `AbortController`, aborting any in-flight fetch from the previous call
+- **Service Worker**: `sw.js` caches static assets (cache-first) and KOSIS data (network-first, max 5 entries) for offline viewing; registered in `index.html`
 
 ### Module pattern
-`geo/region_mapping.js` and `geo/flow_style.js` use UMD wrappers:
+All `geo/*.js` modules use UMD wrappers:
 - In Node.js (tests): accessed via `require("../geo/flow_style")`
-- In browser: exposed as `window.regionMapping` and `window.flowStyle`
+- In browser: exposed as `window.regionMapping`, `window.flowStyle`, `window.dataUtils`, `window.dataProcessing`
 
-`app.js` is browser-only and reads DOM elements directly via `document.getElementById`.
+`geo/data_processing.js` depends on `geo/flow_style.js` and `geo/data_utils.js` (loaded via `require` in Node, `window` in browser).
+
+`app.js` is browser-only and reads DOM elements directly via `document.getElementById`. It imports from the UMD modules via `window.dataUtils` and `window.dataProcessing`.
 
 ## Code Conventions
 
@@ -115,8 +124,10 @@ CSS variables defined at the root level: `--bg`, `--ink`, `--muted`, `--accent`,
 
 ### Accessibility
 - Semantic HTML (`<button>`, `<label>`, `<main>`, `<footer>`)
-- ARIA attributes (`aria-label`, `aria-expanded`, `role="status"`)
+- ARIA attributes (`aria-label`, `aria-expanded`, `aria-controls`, `role="status"`, `role="alert"`)
 - Keyboard support: Escape closes settings, Tab navigation works
+- `:focus-visible` outline styles for keyboard navigation
+- `prefers-reduced-motion` media query disables animations/transitions
 
 ## Testing Policy
 
@@ -126,7 +137,7 @@ CSS variables defined at the root level: `--bg`, `--ink`, `--muted`, `--accent`,
 - Each test file covers one behavior or module
 - Tests use `require("assert")` with `assert.strictEqual`, `assert.ok`, `assert.deepStrictEqual`
 - Tests may read source files with `fs.readFileSync` to validate HTML structure or CSS rules
-- Tests import UMD modules via `require("../geo/flow_style")` or `require("../geo/region_mapping")`
+- Tests import UMD modules via `require("../geo/flow_style")`, `require("../geo/region_mapping")`, `require("../geo/data_utils")`, or `require("../geo/data_processing")`
 
 ### After every change
 Run affected test files to verify nothing is broken:
@@ -168,7 +179,8 @@ window.KOSIS_DATA_BASE_URL = "https://raw.githubusercontent.com/Dobuzi/demograph
 - Flow colors: `FLOW_COLORS` in `geo/flow_style.js`
 - Flow width: `flowWidthScale()` in `geo/flow_style.js`
 - Number of flows shown: `flowDisplayCount()` and `flowPulseCount()` in `geo/flow_style.js`
-- SVG path generation: `flowPath()` in `app.js`
+- SVG path generation: `flowPath()` in `app.js` (includes NaN guard for overlapping centroids)
+- Data aggregation: `buildFlows()` and `buildNet()` in `geo/data_processing.js`
 - Gradient stops: `buildGradientStops()` in `geo/flow_style.js`
 
 ### Adding a new region alias

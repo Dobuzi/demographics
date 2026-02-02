@@ -5,6 +5,11 @@
     root.regionMapping = factory();
   }
 })(this, function () {
+  /**
+   * Canonical Sido name → two-digit administrative code.
+   * Covers all 17 current South Korean Sido-level regions.
+   * @type {Object<string, string>}
+   */
   const NAME_TO_CODE = {
     서울특별시: "11",
     부산광역시: "26",
@@ -25,6 +30,13 @@
     제주특별자치도: "50",
   };
 
+  /**
+   * Short/variant names → canonical Sido names.
+   * Maps common abbreviations and older administrative names
+   * (e.g. "강원도" → "강원특별자치도", "전라북도" → "전북특별자치도")
+   * to their current canonical forms used in GeoJSON and KOSIS data.
+   * @type {Object<string, string>}
+   */
   const ALIASES = {
     서울: "서울특별시",
     부산: "부산광역시",
@@ -47,11 +59,23 @@
     제주: "제주특별자치도",
   };
 
+  /**
+   * Normalize a region name to its canonical Sido form.
+   * If the input is an alias (short or legacy name), it is expanded.
+   * If already canonical or unknown, returned as-is.
+   * @param {string} name - Raw region name from GeoJSON or user input.
+   * @returns {string} Canonical Sido name, or empty string if falsy input.
+   */
   function normalizeSidoName(name) {
     if (!name) return "";
     return ALIASES[name] || name;
   }
 
+  /**
+   * Map a region name (canonical or alias) to its two-digit Sido code.
+   * @param {string} name - Region name (any form recognized by normalizeSidoName).
+   * @returns {string|null} Two-digit code (e.g. "11" for Seoul), or null if not found.
+   */
   function mapSidoNameToCode(name) {
     const normalized = normalizeSidoName(name);
     return NAME_TO_CODE[normalized] || null;
