@@ -7,7 +7,7 @@ Guide for AI assistants working on this repository.
 **Demographics** is a static web application that visualizes Korea's internal population migration flows. It renders an interactive SVG map showing migration between 17 administrative regions (Sido) using data from the Korean Statistical Information Service (KOSIS).
 
 - **Live site**: https://dobuzi.github.io/demographics/
-- **Tech stack**: Vanilla HTML/CSS/JS — no frameworks, no bundler, no npm
+- **Tech stack**: Vanilla HTML/CSS/JS — no frameworks, no bundler (Playwright for E2E tests only)
 - **Language**: UI text is in Korean
 - **Data**: KOSIS API (1995-2025), hosted as gzip-compressed JSON in a separate repo (`Dobuzi/demographics-data`)
 
@@ -36,7 +36,13 @@ scripts/
   merge_kosis_data.py       Merge yearly files into single JSON
 
 tests/
-  *.test.js           48 test files using Node.js assert module (no test runner)
+  *.test.js           48 unit test files using Node.js assert module (no test runner)
+
+e2e/
+  *.spec.js           Playwright E2E tests for browser interactions
+
+package.json          Playwright dev dependency only (no runtime deps)
+playwright.config.js  Playwright configuration
 
 .github/workflows/
   pages.yml           GitHub Actions: deploy to GitHub Pages on push to main
@@ -45,7 +51,7 @@ tests/
 
 ### Gitignored paths
 
-`.env`, `data/`, `kosis_all.json`, `kosis_all.json.gz`, `openApi_manual_v1.0.pdf`, `Demographics.mov`
+`.env`, `data/`, `kosis_all.json`, `kosis_all.json.gz`, `openApi_manual_v1.0.pdf`, `Demographics.mov`, `node_modules/`, `playwright-report/`, `test-results/`
 
 ## Development Commands
 
@@ -61,10 +67,20 @@ node tests/<name>.test.js
 ```
 There is no test runner. Each file is self-contained and uses `require("assert")`. Run files directly with `node`.
 
-### Run all tests
+### Run all unit tests
 ```bash
 for f in tests/*.test.js; do node "$f"; done
 ```
+
+### Run E2E tests (requires npm install)
+```bash
+npm install                # First time only
+npx playwright install     # First time only (downloads browsers)
+npm run test:e2e           # Run all E2E tests
+npm run test:e2e:ui        # Run with Playwright UI
+```
+
+E2E tests cover: page load, map interactions, controls, accessibility, responsive layout.
 
 ### Data pipeline (Python, requires .env with API_KEY)
 ```bash

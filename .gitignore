@@ -5,3 +5,11 @@ openApi_manual_v1.0.pdf
 kosis_all.json
 kosis_all.json.gz
 Demographics.mov
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
