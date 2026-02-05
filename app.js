@@ -1061,7 +1061,17 @@ function init() {
     PLAY_TOGGLE.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
   }
   bindControls();
-  refresh();
+
+  /* Defer initial data load to after first paint for better FCP */
+  const deferredRefresh = () => {
+    console.log("[init] deferred refresh start");
+    refresh();
+  };
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(deferredRefresh, { timeout: 1000 });
+  } else {
+    setTimeout(deferredRefresh, 0);
+  }
 }
 
 init();
