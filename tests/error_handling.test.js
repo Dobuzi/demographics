@@ -18,6 +18,22 @@ assert.ok(
 assert.ok(js.includes("AbortController"), "AbortController missing");
 assert.ok(js.includes("refreshAbortController"), "refresh abort controller missing");
 assert.ok(js.includes("signal.aborted"), "abort signal check missing");
+assert.ok(
+  /loadGeoJson\(signal\)/.test(js),
+  "loadGeoJson should receive abort signal"
+);
+assert.ok(
+  /loadOfficeCenters\(signal\)/.test(js),
+  "loadOfficeCenters should receive abort signal"
+);
+assert.ok(
+  /fetch\(GEOJSON_PATH,\s*\{\s*signal\s*\}/.test(js),
+  "GeoJSON fetch should use abort signal"
+);
+assert.ok(
+  /fetch\(OFFICE_CENTERS_PATH,\s*\{\s*signal\s*\}/.test(js),
+  "office centers fetch should use abort signal"
+);
 
 // --- Data validation ---
 assert.ok(js.includes("validateDataset"), "dataset validation missing");

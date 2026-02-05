@@ -375,11 +375,11 @@ async function loadMergedData(signal) {
   }
 }
 
-async function loadOfficeCenters() {
+async function loadOfficeCenters(signal) {
   if (officeCenters) return officeCenters;
   console.log("[loadOfficeCenters] start");
   try {
-    const response = await fetch(OFFICE_CENTERS_PATH);
+    const response = await fetch(OFFICE_CENTERS_PATH, { signal });
     console.log("[loadOfficeCenters] fetch", response.status);
     if (!response.ok) return null;
     const payload = await response.json();
@@ -394,20 +394,20 @@ async function loadOfficeCenters() {
   }
 }
 
-async function loadGeoJson() {
+async function loadGeoJson(signal) {
   if (geoIndex) return geoIndex;
   if (!normalizeSidoName || !mapSidoNameToCode) {
     throw new Error("지역 매핑 스크립트를 불러오지 못했습니다.");
   }
   console.log("[loadGeoJson] start");
-  const response = await fetch(GEOJSON_PATH);
+  const response = await fetch(GEOJSON_PATH, { signal });
   console.log("[loadGeoJson] fetch", response.status);
   if (!response.ok) {
     throw new Error("GeoJSON 경계 파일을 불러올 수 없습니다.");
   }
   const geojson = await response.json();
   console.log("[loadGeoJson] features", geojson?.features?.length || 0);
-  const centers = await loadOfficeCenters();
+  const centers = await loadOfficeCenters(signal);
   geoIndex = buildRegionIndex(geojson, 900, 780, centers);
   return geoIndex;
 }
@@ -742,7 +742,8 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     const animation = flowGradientAnimation
       ? flowGradientAnimation(flow.value, maxValue)
       : null;
-    if (animation) {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (animation && !prefersReducedMotion) {
       const anim = document.createElementNS("http://www.w3.org/2000/svg", "animateTransform");
       anim.setAttribute("attributeName", "gradientTransform");
       anim.setAttribute("type", "translate");
@@ -931,7 +932,7 @@ async function refresh() {
   setLoading(PLAY_LOADING, true);
   hideError();
   try {
-    const regionIndex = await loadGeoJson();
+    const regionIndex = await loadGeoJson(signal);
     if (signal.aborted) return;
     const data = await loadData(year, month, signal);
     if (signal.aborted) return;
