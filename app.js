@@ -83,6 +83,13 @@ const {
   buildNet: computeNet,
 } = window.dataProcessing || {};
 
+const {
+  collectCoords: _collectCoords,
+  buildProjection: _buildProjection,
+  geometryToPath: _geometryToPath,
+  geometryCentroid: _geometryCentroid,
+} = window.geoUtils || {};
+
 /* ─── State ─── */
 const cache = new Map();
 const cacheOrder = [];
@@ -437,9 +444,9 @@ async function loadData(year, month, signal) {
   return data;
 }
 
-/* ─── Geo / Projection ─── */
+/* ─── Geo / Projection (delegates to geo_utils module) ─── */
 
-function collectCoords(geometry, handler) {
+const collectCoords = _collectCoords || function (geometry, handler) {
   if (geometry.type === "Polygon") {
     geometry.coordinates.forEach((ring) => ring.forEach(handler));
   } else if (geometry.type === "MultiPolygon") {
@@ -447,75 +454,38 @@ function collectCoords(geometry, handler) {
       polygon.forEach((ring) => ring.forEach(handler))
     );
   }
-}
+};
 
-function buildProjection(features, width, height, padding = 30, coordFilter) {
-  let minLon = Infinity;
-  let maxLon = -Infinity;
-  let minLat = Infinity;
-  let maxLat = -Infinity;
-
-  features.forEach((feature) => {
-    collectCoords(feature.geometry, ([lon, lat]) => {
-      if (coordFilter && !coordFilter(lon, lat)) return;
-      minLon = Math.min(minLon, lon);
-      maxLon = Math.max(maxLon, lon);
-      minLat = Math.min(minLat, lat);
-      maxLat = Math.max(maxLat, lat);
-    });
-  });
-
-  const lonSpan = maxLon - minLon;
-  const latSpan = maxLat - minLat;
-  const scaleX = (width - padding * 2) / lonSpan;
-  const scaleY = (height - padding * 2) / latSpan;
-  const scale = Math.min(scaleX, scaleY);
-
-  const clampLon = (lon) => {
-    if (lon <= FAR_EAST_LON) return lon;
-    return FAR_EAST_LON + (lon - FAR_EAST_LON) * FAR_EAST_COMPRESS;
-  };
-
+const buildProjection = _buildProjection || function (features, width, height, padding = 30, coordFilter) {
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  features.forEach((f) => collectCoords(f.geometry, ([lon, lat]) => {
+    if (coordFilter && !coordFilter(lon, lat)) return;
+    minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
+    minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
+  }));
+  const scale = Math.min((width - padding * 2) / (maxLon - minLon), (height - padding * 2) / (maxLat - minLat));
   return ([lon, lat]) => {
-    const adjLon = clampLon(lon);
-    const x = padding + (adjLon - minLon) * scale;
-    const y = height - padding - (lat - minLat) * scale;
-    return { x, y };
+    const adjLon = lon <= FAR_EAST_LON ? lon : FAR_EAST_LON + (lon - FAR_EAST_LON) * FAR_EAST_COMPRESS;
+    return { x: padding + (adjLon - minLon) * scale, y: height - padding - (lat - minLat) * scale };
   };
-}
+};
 
-function geometryToPath(geometry, project) {
+const geometryToPath = _geometryToPath || function (geometry, project) {
   const segments = [];
   const addRing = (ring) => {
-    ring.forEach(([lon, lat], index) => {
-      const { x, y } = project([lon, lat]);
-      segments.push(`${index === 0 ? "M" : "L"} ${x} ${y}`);
-    });
+    ring.forEach(([lon, lat], i) => segments.push(`${i === 0 ? "M" : "L"} ${project([lon, lat]).x} ${project([lon, lat]).y}`));
     segments.push("Z");
   };
-
-  if (geometry.type === "Polygon") {
-    geometry.coordinates.forEach(addRing);
-  } else if (geometry.type === "MultiPolygon") {
-    geometry.coordinates.forEach((polygon) => polygon.forEach(addRing));
-  }
-
+  if (geometry.type === "Polygon") geometry.coordinates.forEach(addRing);
+  else if (geometry.type === "MultiPolygon") geometry.coordinates.forEach((p) => p.forEach(addRing));
   return segments.join(" ");
-}
+};
 
-function geometryCentroid(geometry, project) {
-  let sumX = 0;
-  let sumY = 0;
-  let count = 0;
-  collectCoords(geometry, ([lon, lat]) => {
-    const { x, y } = project([lon, lat]);
-    sumX += x;
-    sumY += y;
-    count += 1;
-  });
-  if (!count) return { x: 0, y: 0 };
-  return { x: sumX / count, y: sumY / count };
-}
+const geometryCentroid = _geometryCentroid || function (geometry, project) {
+  let sumX = 0, sumY = 0, count = 0;
+  collectCoords(geometry, ([lon, lat]) => { const { x, y } = project([lon, lat]); sumX += x; sumY += y; count += 1; });
+  return count ? { x: sumX / count, y: sumY / count } : { x: 0, y: 0 };
+};
 
 function buildRegionIndex(geojson, width, height, centers) {
   const project = buildProjection(
@@ -821,46 +791,61 @@ function drawFlows(flows, regions, pulseCount, netValues) {
       path.classList.add("flow-line--pulse");
     }
     path.style.setProperty("--flow-speed", "0s");
-    path.addEventListener("pointerenter", () => {
-      if (playState.isPlaying) return;
-      flowGroup.classList.add("is-muted");
-      const nodes = flowGroup.querySelectorAll(`[data-flow-id="${path.dataset.flowId}"]`);
-      nodes.forEach((node) => node.classList.add("is-highlight"));
-      highlightRegions(path.dataset.fromCode, path.dataset.toCode);
-    });
-    path.addEventListener("pointerleave", () => {
-      const nodes = flowGroup.querySelectorAll(`[data-flow-id="${path.dataset.flowId}"]`);
-      nodes.forEach((node) => node.classList.remove("is-highlight"));
-      flowGroup.classList.remove("is-muted");
-      clearRegionHighlights();
-      if (FLOW_TOOLTIP) {
-        FLOW_TOOLTIP.classList.remove("is-active");
-      }
-    });
-    path.addEventListener("pointermove", (event) => {
-      if (playState.isPlaying) return;
-      if (!FLOW_TOOLTIP) return;
-      const meta = {
-        from: path.dataset.from,
-        to: path.dataset.to,
-        value: path.dataset.value,
-      };
-      if (isFlowMetaValid && !isFlowMetaValid(meta)) {
-        FLOW_TOOLTIP.classList.remove("is-active");
-        return;
-      }
-      const label = formatFlowLabel
-        ? formatFlowLabel(meta.from, meta.to, Number(meta.value))
-        : `${meta.from} → ${meta.to} · ${formatNumber(Number(meta.value))}명`;
-      FLOW_TOOLTIP.textContent = label;
-      FLOW_TOOLTIP.classList.add("is-active");
-      const rect = FLOW_MAP.getBoundingClientRect();
-      const x = event.clientX - rect.left + 12;
-      const y = event.clientY - rect.top + 12;
-      FLOW_TOOLTIP.style.transform = `translate(${x}px, ${y}px)`;
-    });
     flowGroup.appendChild(path);
   });
+
+  /* ─── Event delegation on flowGroup (3 listeners instead of N×3) ─── */
+
+  flowGroup.addEventListener("pointerenter", (event) => {
+    const target = event.target.closest(".flow-line");
+    if (!target || playState.isPlaying) return;
+    const flowId = target.dataset.flowId;
+    if (!flowId) return;
+    flowGroup.classList.add("is-muted");
+    flowGroup.querySelectorAll(`[data-flow-id="${flowId}"]`).forEach((node) =>
+      node.classList.add("is-highlight")
+    );
+    highlightRegions(target.dataset.fromCode, target.dataset.toCode);
+  }, true);
+
+  flowGroup.addEventListener("pointerleave", (event) => {
+    const target = event.target.closest(".flow-line");
+    if (!target) return;
+    const flowId = target.dataset.flowId;
+    if (!flowId) return;
+    flowGroup.querySelectorAll(`[data-flow-id="${flowId}"]`).forEach((node) =>
+      node.classList.remove("is-highlight")
+    );
+    flowGroup.classList.remove("is-muted");
+    clearRegionHighlights();
+    if (FLOW_TOOLTIP) {
+      FLOW_TOOLTIP.classList.remove("is-active");
+    }
+  }, true);
+
+  flowGroup.addEventListener("pointermove", (event) => {
+    if (playState.isPlaying || !FLOW_TOOLTIP) return;
+    const target = event.target.closest(".flow-line");
+    if (!target) return;
+    const meta = {
+      from: target.dataset.from,
+      to: target.dataset.to,
+      value: target.dataset.value,
+    };
+    if (isFlowMetaValid && !isFlowMetaValid(meta)) {
+      FLOW_TOOLTIP.classList.remove("is-active");
+      return;
+    }
+    const label = formatFlowLabel
+      ? formatFlowLabel(meta.from, meta.to, Number(meta.value))
+      : `${meta.from} → ${meta.to} · ${formatNumber(Number(meta.value))}명`;
+    FLOW_TOOLTIP.textContent = label;
+    FLOW_TOOLTIP.classList.add("is-active");
+    const rect = FLOW_MAP.getBoundingClientRect();
+    const x = event.clientX - rect.left + 12;
+    const y = event.clientY - rect.top + 12;
+    FLOW_TOOLTIP.style.transform = `translate(${x}px, ${y}px)`;
+  }, true);
 
   FLOW_MAP.appendChild(defs);
   FLOW_MAP.appendChild(flowGroup);

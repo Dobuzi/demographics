@@ -22,6 +22,7 @@ sw.js               Service Worker: offline caching of static assets and recent 
 geo/
   region_mapping.js   UMD module: region name normalization and Sido code mapping (17 regions)
   flow_style.js       UMD module: flow colors, width scaling, display counts, label formatting
+  geo_utils.js        UMD module: coordinate projection, SVG path generation, centroid calculation
   data_utils.js       UMD module: data validation, timeline, cache keys, formatting helpers
   data_processing.js  UMD module: buildFlows() and buildNet() — extracted from app.js
 
@@ -35,7 +36,7 @@ scripts/
   merge_kosis_data.py       Merge yearly files into single JSON
 
 tests/
-  *.test.js           45 test files using Node.js assert module (no test runner)
+  *.test.js           48 test files using Node.js assert module (no test runner)
 
 .github/workflows/
   pages.yml           GitHub Actions: deploy to GitHub Pages on push to main
@@ -94,7 +95,7 @@ User interaction -> DOM event -> refresh() -> loadData(year) -> buildFlows() -> 
 ### Module pattern
 All `geo/*.js` modules use UMD wrappers:
 - In Node.js (tests): accessed via `require("../geo/flow_style")`
-- In browser: exposed as `window.regionMapping`, `window.flowStyle`, `window.dataUtils`, `window.dataProcessing`
+- In browser: exposed as `window.regionMapping`, `window.flowStyle`, `window.geoUtils`, `window.dataUtils`, `window.dataProcessing`
 
 `geo/data_processing.js` depends on `geo/flow_style.js` and `geo/data_utils.js` (loaded via `require` in Node, `window` in browser).
 
@@ -137,7 +138,7 @@ CSS variables defined at the root level: `--bg`, `--ink`, `--muted`, `--accent`,
 - Each test file covers one behavior or module
 - Tests use `require("assert")` with `assert.strictEqual`, `assert.ok`, `assert.deepStrictEqual`
 - Tests may read source files with `fs.readFileSync` to validate HTML structure or CSS rules
-- Tests import UMD modules via `require("../geo/flow_style")`, `require("../geo/region_mapping")`, `require("../geo/data_utils")`, or `require("../geo/data_processing")`
+- Tests import UMD modules via `require("../geo/flow_style")`, `require("../geo/region_mapping")`, `require("../geo/geo_utils")`, `require("../geo/data_utils")`, or `require("../geo/data_processing")`
 
 ### After every change
 Run affected test files to verify nothing is broken:

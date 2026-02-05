@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
   "./styles.css",
   "./geo/region_mapping.js",
   "./geo/flow_style.js",
+  "./geo/geo_utils.js",
   "./geo/data_utils.js",
   "./geo/data_processing.js",
   "./assets/geo/korea_sido.geojson",
