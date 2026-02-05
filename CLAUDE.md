@@ -36,13 +36,17 @@ scripts/
   merge_kosis_data.py       Merge yearly files into single JSON
 
 tests/
-  *.test.js           48 unit test files using Node.js assert module (no test runner)
+  *.test.js           49 unit test files using Node.js assert module (no test runner)
 
 e2e/
   *.spec.js           Playwright E2E tests for browser interactions
 
+types/
+  *.d.ts              TypeScript type definitions for IDE support
+
 package.json          Playwright dev dependency only (no runtime deps)
 playwright.config.js  Playwright configuration
+jsconfig.json         TypeScript/JS config for editor support
 
 .github/workflows/
   pages.yml           GitHub Actions: deploy to GitHub Pages on push to main
