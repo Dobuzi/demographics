@@ -59,6 +59,10 @@ assert.ok(
   /prefers-reduced-motion[\s\S]*animation:\s*none/.test(css),
   "reduced motion should disable animations"
 );
+assert.ok(
+  js.includes('matchMedia("(prefers-reduced-motion: reduce)")'),
+  "SVG gradient animation should check prefers-reduced-motion"
+);
 
 // --- SVG has role and aria-label ---
 assert.ok(
