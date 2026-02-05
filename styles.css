@@ -216,34 +216,6 @@ body {
   pointer-events: none;
 }
 
-@media (max-width: 640px) {
-  .settings-toggle {
-    left: 16px;
-    bottom: 12px;
-    font-size: 11px;
-    padding: 6px 10px;
-  }
-
-  .overlay-settings {
-    left: 16px;
-    right: 16px;
-    bottom: 12px;
-    max-width: none;
-  }
-
-  .overlay-flows {
-    right: 12px;
-    bottom: 64px;
-    max-width: 260px;
-  }
-
-  .panel-settings {
-    max-height: none;
-    overflow: visible;
-    padding: 10px;
-  }
-}
-
 .panel-settings .controls {
   gap: 6px 10px;
   margin-top: 6px;
@@ -544,13 +516,6 @@ select {
   margin: 0;
 }
 
-.viz {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 24px;
-}
-
-
 .map-card {
   background: transparent;
   color: #fff;
@@ -762,22 +727,6 @@ select {
   opacity: 1;
 }
 
-.sidebar {
-  background: var(--panel);
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.sidebar h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-
 .stat-grid {
   display: grid;
   gap: 12px;
@@ -875,42 +824,6 @@ select {
   }
 }
 
-.legend {
-  border-top: 1px dashed rgba(255, 255, 255, 0.2);
-  padding-top: 12px;
-  font-size: 12px;
-  color: rgba(199, 204, 212, 0.8);
-  display: grid;
-  gap: 8px;
-}
-
-.legend__row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.legend__dot {
-  width: 12px;
-  height: 12px;
-  background: rgba(244, 106, 58, 0.9);
-  border-radius: 50%;
-}
-
-.legend__line {
-  width: 22px;
-  height: 3px;
-  background: linear-gradient(90deg, rgba(244, 106, 58, 0.9), rgba(244, 106, 58, 0));
-  border-radius: 3px;
-}
-
-.map-meta {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
-
 .footer {
   margin: 0;
   padding: 8px 10px 6px;
@@ -933,14 +846,6 @@ select {
 
 .footer a:hover {
   color: rgba(245, 246, 248, 0.9);
-}
-
-.month-control {
-  display: none;
-}
-
-.month-control.is-active {
-  display: flex;
 }
 
 @media (max-width: 960px) {
@@ -967,6 +872,26 @@ select {
 @media (max-width: 640px) {
   .page {
     padding: 0;
+  }
+
+  .settings-toggle {
+    left: 16px;
+    bottom: 12px;
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  .overlay-settings {
+    left: 16px;
+    right: 16px;
+    bottom: 12px;
+    max-width: none;
+  }
+
+  .overlay-flows {
+    right: 12px;
+    bottom: 64px;
+    max-width: 260px;
   }
 
   .top-row {
@@ -1134,13 +1059,13 @@ select {
     top: 10px;
     left: 10px;
     right: 10px;
+    gap: 6px;
   }
 
-
   .panel-settings {
-    max-height: 65vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    max-height: none;
+    overflow: visible;
+    padding: 10px;
   }
 
   .panel-settings .controls {
@@ -1153,10 +1078,6 @@ select {
 
   .map-header h1 {
     font-size: 20px;
-  }
-
-  .map-tags {
-    gap: 6px;
   }
 }
 .stat-grid .stat--total {
