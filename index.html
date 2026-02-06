@@ -144,6 +144,13 @@
                 </label>
               </div>
               <div class="panel__footer">
+                <label class="field field-lang">
+                  Language
+                  <select id="lang-switch" aria-label="Language">
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
               </div>
             </section>
           </div>
@@ -165,6 +172,7 @@
     <script src="geo/geo_utils.js"></script>
     <script src="geo/data_utils.js"></script>
     <script src="geo/data_processing.js"></script>
+    <script src="geo/i18n.js"></script>
     <script src="app.js"></script>
     <script>
       if ("serviceWorker" in navigator) {
