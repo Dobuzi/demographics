@@ -107,6 +107,8 @@ let keyboardFlowState = {
   selectedIndex: -1,
   flowElements: [],
 };
+let previousYear = null;
+let lastNavigationDirection = 1; /* 1 = forward, -1 = backward */
 
 /* ─── Cache ─── */
 
@@ -1005,6 +1007,13 @@ async function refresh() {
   const year = Number(YEAR_RANGE.value);
   const isMonthly = year === 2025;
   const month = isMonthly ? DEFAULT_MONTH : null;
+
+  /* Detect navigation direction for directional prefetch */
+  if (previousYear !== null && year !== previousYear) {
+    lastNavigationDirection = year > previousYear ? 1 : -1;
+    console.log("[refresh] direction", lastNavigationDirection > 0 ? "forward" : "backward");
+  }
+  previousYear = year;
   const ageIndex = getAgeIndex ? getAgeIndex(AGE_RANGE.value) : 0;
   const useAllAge = false;
   const options = {
@@ -1036,6 +1045,24 @@ async function refresh() {
     updateTopList(flows);
     syncLabels(year, options.age, total, month, "총 이동 규모");
     renderNetLegend();
+
+    /* Directional prefetch: prefetch next period based on navigation direction */
+    if (!playState.isPlaying) {
+      const timeline = buildTimeline ? buildTimeline() : [];
+      const currentIndex = timeline.findIndex(
+        (entry) => entry.year === year && entry.month === month
+      );
+      if (currentIndex >= 0) {
+        const prefetchCount = getPrefetchCount();
+        for (let offset = 1; offset <= prefetchCount; offset += 1) {
+          const targetIndex = currentIndex + offset * lastNavigationDirection;
+          if (targetIndex >= 0 && targetIndex < timeline.length) {
+            prefetchPeriod(timeline[targetIndex]);
+          }
+        }
+        console.log("[refresh] directional prefetch", lastNavigationDirection > 0 ? "forward" : "backward");
+      }
+    }
   } catch (error) {
     if (error.name === "AbortError") {
       console.log("[refresh] aborted");
