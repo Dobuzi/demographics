@@ -90,6 +90,9 @@ const {
   geometryCentroid: _geometryCentroid,
 } = window.geoUtils || {};
 
+/* Canvas renderer for high-performance flow visualization (optional) */
+const canvasRenderer = window.canvasRenderer || null;
+
 /* ─── State ─── */
 const cache = new Map();
 const cacheOrder = [];
