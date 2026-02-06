@@ -580,15 +580,30 @@ function buildNet(data, options, regionIndex) {
 
 /* ─── SVG Rendering ─── */
 
+/**
+ * Schedule a callback to run on the next animation frame.
+ * Batches DOM updates to avoid layout thrashing.
+ * @param {function} callback
+ */
+function scheduleRender(callback) {
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(callback);
+  } else {
+    callback();
+  }
+}
+
 function drawBaseMap(svg, regions, mode, netValues, height) {
   const width = 900;
-  svg.innerHTML = "";
+
+  /* Use DocumentFragment to batch DOM operations */
+  const fragment = document.createDocumentFragment();
 
   const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
   background.setAttribute("width", width);
   background.setAttribute("height", height);
   background.setAttribute("fill", "#101218");
-  svg.appendChild(background);
+  fragment.appendChild(background);
 
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
   const inboundGradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
@@ -611,14 +626,12 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
     '<stop offset="100%" stop-color="rgba(240, 91, 76, 0.2)"/>';
   defs.appendChild(inboundGradient);
   defs.appendChild(outboundGradient);
-  svg.appendChild(defs);
+  fragment.appendChild(defs);
 
   const values = Array.from(netValues.values());
   const maxAbs = Math.max(...values.map((value) => Math.abs(value)), 1);
   const polygonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
   polygonGroup.setAttribute("id", "region-polygons");
-  const netFillInbound = FLOW_COLORS ? FLOW_COLORS.inbound : "#27d17f";
-  const netFillOutbound = FLOW_COLORS ? FLOW_COLORS.outbound : "#f05b4c";
 
   regions.forEach((region) => {
     const polygon = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -640,8 +653,7 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
     polygon.setAttribute("fill", fill);
     polygonGroup.appendChild(polygon);
   });
-
-  svg.appendChild(polygonGroup);
+  fragment.appendChild(polygonGroup);
 
   const dotGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
   dotGroup.setAttribute("id", "region-dots");
@@ -663,7 +675,13 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
     label.textContent = region.name.replace("특별자치", "").replace("광역시", "").replace("특별시", "");
     dotGroup.appendChild(label);
   });
-  svg.appendChild(dotGroup);
+  fragment.appendChild(dotGroup);
+
+  /* Single DOM write: clear and append all at once */
+  scheduleRender(() => {
+    svg.innerHTML = "";
+    svg.appendChild(fragment);
+  });
 }
 
 /**
