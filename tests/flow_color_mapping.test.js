@@ -10,8 +10,8 @@ assert.ok(
   "flow gradient should run outbound -> inbound"
 );
 assert.ok(
-  js.includes("netFillInbound") && js.includes("netFillOutbound"),
-  "net fill colors should use inbound/outbound mapping"
+  js.includes("net-inbound-gradient") && js.includes("net-outbound-gradient"),
+  "net fill should use inbound/outbound gradient mappings"
 );
 
 console.log("flow_color_mapping.test.js passed");

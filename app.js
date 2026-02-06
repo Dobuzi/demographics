@@ -103,6 +103,10 @@ let playState = {
   timer: null,
   loopId: 0,
 };
+let keyboardFlowState = {
+  selectedIndex: -1,
+  flowElements: [],
+};
 
 /* ─── Cache ─── */
 
@@ -295,9 +299,24 @@ function initSettingsToggle() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    if (SETTINGS_PANEL.classList.contains("is-collapsed")) return;
-    closeSettings();
+    if (event.key === "Escape") {
+      if (!SETTINGS_PANEL.classList.contains("is-collapsed")) {
+        closeSettings();
+        return;
+      }
+      if (window.clearFlowKeyboardSelection) {
+        window.clearFlowKeyboardSelection();
+      }
+      return;
+    }
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const delta = event.key === "ArrowUp" ? -1 : 1;
+      const nextIndex = keyboardFlowState.selectedIndex + delta;
+      if (window.selectFlowByKeyboard) {
+        window.selectFlowByKeyboard(nextIndex < 0 ? 0 : nextIndex);
+      }
+    }
   });
 }
 
@@ -730,6 +749,53 @@ function drawFlows(flows, regions, pulseCount, netValues) {
       inbound.className = `region-shape ${getRegionHighlightClass ? getRegionHighlightClass("inbound") : "region-highlight inbound"}`;
     }
   };
+
+  /* ─── Keyboard Flow Selection ─── */
+  const selectFlowByKeyboard = (index) => {
+    if (playState.isPlaying) return;
+    const flowLines = flowGroup.querySelectorAll(".flow-line");
+    if (flowLines.length === 0) return;
+    const clampedIndex = ((index % flowLines.length) + flowLines.length) % flowLines.length;
+    clearFlowKeyboardSelection();
+    keyboardFlowState.selectedIndex = clampedIndex;
+    keyboardFlowState.flowElements = Array.from(flowLines);
+    const target = flowLines[clampedIndex];
+    if (!target) return;
+    const flowId = target.dataset.flowId;
+    flowGroup.classList.add("is-muted");
+    flowGroup.querySelectorAll(`[data-flow-id="${flowId}"]`).forEach((node) =>
+      node.classList.add("is-highlight", "is-keyboard-selected")
+    );
+    highlightRegions(target.dataset.fromCode, target.dataset.toCode);
+    if (FLOW_TOOLTIP) {
+      const meta = {
+        from: target.dataset.from,
+        to: target.dataset.to,
+        value: target.dataset.value,
+      };
+      const label = formatFlowLabel
+        ? formatFlowLabel(meta.from, meta.to, Number(meta.value))
+        : `${meta.from} → ${meta.to} · ${formatNumber(Number(meta.value))}명`;
+      FLOW_TOOLTIP.textContent = label;
+      FLOW_TOOLTIP.classList.add("is-active");
+      FLOW_TOOLTIP.style.transform = "translate(50%, 50%)";
+    }
+    console.log("[keyboard] selected flow", clampedIndex, target.dataset.label);
+  };
+  const clearFlowKeyboardSelection = () => {
+    flowGroup.querySelectorAll(".is-keyboard-selected").forEach((node) => {
+      node.classList.remove("is-highlight", "is-keyboard-selected");
+    });
+    flowGroup.classList.remove("is-muted");
+    clearRegionHighlights();
+    if (FLOW_TOOLTIP) {
+      FLOW_TOOLTIP.classList.remove("is-active");
+    }
+    keyboardFlowState.selectedIndex = -1;
+  };
+  window.selectFlowByKeyboard = selectFlowByKeyboard;
+  window.clearFlowKeyboardSelection = clearFlowKeyboardSelection;
+
   flows.forEach((flow, index) => {
     const source = flow.from.centroid;
     const target = flow.to.centroid;
