@@ -181,6 +181,24 @@
       </footer>
     </div>
 
+    <!-- Flow Detail Modal -->
+    <div class="flow-modal" id="flow-modal" role="dialog" aria-labelledby="flow-modal-title" aria-hidden="true">
+      <div class="flow-modal__backdrop" id="flow-modal-backdrop"></div>
+      <div class="flow-modal__content glass-panel">
+        <header class="flow-modal__header">
+          <h2 id="flow-modal-title" class="flow-modal__title">이동 상세</h2>
+          <button type="button" class="flow-modal__close" id="flow-modal-close" aria-label="닫기">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </header>
+        <div class="flow-modal__body">
+          <div class="flow-modal__route" id="flow-modal-route"></div>
+          <div class="flow-modal__value" id="flow-modal-value"></div>
+          <div class="flow-modal__history" id="flow-modal-history"></div>
+        </div>
+      </div>
+    </div>
+
     <script src="geo/region_mapping.js"></script>
     <script src="geo/flow_style.js"></script>
     <script src="geo/geo_utils.js"></script>

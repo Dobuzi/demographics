@@ -1300,6 +1300,101 @@ input[type="range"]:focus-visible {
   outline-offset: 2px;
 }
 
+/* ─── Flow Detail Modal ─── */
+
+.flow-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.flow-modal[aria-hidden="false"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+.flow-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.flow-modal__content {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  padding: 20px;
+  border-radius: 16px;
+  transform: translateY(20px);
+  transition: transform 0.2s ease;
+}
+
+.flow-modal[aria-hidden="false"] .flow-modal__content {
+  transform: translateY(0);
+}
+
+.flow-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.flow-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.flow-modal__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.flow-modal__close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.flow-modal__route {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.flow-modal__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.flow-modal__history {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
 /* ─── Reduced Motion ─── */
 
 @media (prefers-reduced-motion: reduce) {

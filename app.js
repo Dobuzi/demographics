@@ -223,6 +223,46 @@ function hideError() {
   }
 }
 
+/* ─── Flow Detail Modal ─── */
+
+function openFlowModal(flowData) {
+  const modal = document.getElementById("flow-modal");
+  const route = document.getElementById("flow-modal-route");
+  const value = document.getElementById("flow-modal-value");
+  const history = document.getElementById("flow-modal-history");
+
+  if (!modal || !flowData) return;
+
+  route.textContent = `${flowData.from} → ${flowData.to}`;
+  value.textContent = `${formatNumber(Number(flowData.value))}명`;
+  history.innerHTML = `<p>현재 연도: ${YEAR_RANGE.value}년</p><p>이 경로의 이동자 수입니다.</p>`;
+
+  modal.setAttribute("aria-hidden", "false");
+  console.log("[modal] open", flowData);
+}
+
+function closeFlowModal() {
+  const modal = document.getElementById("flow-modal");
+  if (modal) {
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+function initFlowModal() {
+  const modal = document.getElementById("flow-modal");
+  const backdrop = document.getElementById("flow-modal-backdrop");
+  const closeBtn = document.getElementById("flow-modal-close");
+
+  if (backdrop) backdrop.addEventListener("click", closeFlowModal);
+  if (closeBtn) closeBtn.addEventListener("click", closeFlowModal);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal && modal.getAttribute("aria-hidden") === "false") {
+      closeFlowModal();
+    }
+  });
+}
+
 /* ─── Zoom & Pan ─── */
 
 function updateViewBox() {
@@ -1192,6 +1232,17 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     FLOW_TOOLTIP.style.transform = `translate(${x}px, ${y}px)`;
   }, true);
 
+  /* Click to open flow detail modal */
+  flowGroup.addEventListener("click", (event) => {
+    const target = event.target.closest(".flow-line");
+    if (!target || playState.isPlaying) return;
+    openFlowModal({
+      from: target.dataset.from,
+      to: target.dataset.to,
+      value: target.dataset.value,
+    });
+  }, true);
+
   FLOW_MAP.appendChild(defs);
   FLOW_MAP.appendChild(flowGroup);
 }
@@ -1425,6 +1476,7 @@ function init() {
   initSettingsToggle();
   initZoomPan();
   initTheme();
+  initFlowModal();
   SEX_SELECT.value = "0";
   ITEM_SELECT.value = "T80";
   YEAR_LABEL.textContent = YEAR_RANGE.value;
