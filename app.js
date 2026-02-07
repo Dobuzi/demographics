@@ -486,6 +486,27 @@ function initTheme() {
   }
 }
 
+/* ─── Color-blind Mode ─── */
+
+function setColorPalette(isColorblind) {
+  document.documentElement.setAttribute("data-colorblind", isColorblind ? "true" : "false");
+  localStorage.setItem("demographics-colorblind", isColorblind ? "true" : "false");
+  console.log("[colorblind] set", isColorblind);
+}
+
+function initColorblindToggle() {
+  const toggle = document.getElementById("colorblind-toggle");
+  if (!toggle) return;
+
+  const saved = localStorage.getItem("demographics-colorblind") === "true";
+  toggle.checked = saved;
+  setColorPalette(saved);
+
+  toggle.addEventListener("change", () => {
+    setColorPalette(toggle.checked);
+  });
+}
+
 /* ─── Playback ─── */
 
 function getPlaybackInterval(period) {
@@ -1520,6 +1541,7 @@ function init() {
   initTheme();
   initFlowModal();
   initMinimap();
+  initColorblindToggle();
   SEX_SELECT.value = "0";
   ITEM_SELECT.value = "T80";
   YEAR_LABEL.textContent = YEAR_RANGE.value;

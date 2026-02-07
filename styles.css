@@ -26,6 +26,14 @@
   --region-stroke: #c0c5d0;
 }
 
+/* Color-blind friendly palette (deuteranopia/protanopia safe) */
+[data-colorblind="true"] {
+  --flow-inbound: #0077bb;  /* Blue for inflow */
+  --flow-outbound: #ee7733; /* Orange for outflow */
+  --net-positive: #009988;  /* Teal for net positive */
+  --net-negative: #cc3311;  /* Vermillion for net negative */
+}
+
 /* Loading skeleton styles */
 @keyframes shimmer {
   0% {
@@ -591,6 +599,28 @@ select {
 
 .theme-toggle .material-symbols-rounded {
   font-size: 20px;
+}
+
+.field-colorblind {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.field-colorblind input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.field-colorblind .material-symbols-rounded {
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.field-colorblind:has(input:checked) .material-symbols-rounded {
+  color: var(--accent);
 }
 
 .panel__section {
