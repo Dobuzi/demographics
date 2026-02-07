@@ -892,6 +892,42 @@ select {
   }
 }
 
+/* Flow particle animation */
+@keyframes particleMove {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.flow-particle {
+  fill: #fff;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.8));
+  offset-rotate: 0deg;
+  animation: particleMove var(--particle-duration, 3s) linear infinite;
+  animation-delay: var(--particle-delay, 0s);
+}
+
+.flow-particle--inbound {
+  fill: #27d17f;
+  filter: drop-shadow(0 0 4px rgba(39, 209, 127, 0.8));
+}
+
+.flow-particle--outbound {
+  fill: #f05b4c;
+  filter: drop-shadow(0 0 4px rgba(240, 91, 76, 0.8));
+}
+
 .map-overlay {
   position: absolute;
   inset: 0;

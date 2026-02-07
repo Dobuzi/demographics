@@ -1087,6 +1087,30 @@ function flowPath(source, target) {
   return `M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`;
 }
 
+/**
+ * Create animated particle elements for a flow path
+ * @param {string} pathD - SVG path d attribute
+ * @param {number} index - Flow index for unique IDs
+ * @param {number} particleCount - Number of particles to create
+ * @returns {Array} Array of SVG circle elements
+ */
+function createFlowParticles(pathD, index, particleCount = 3) {
+  const particles = [];
+  const duration = 2 + Math.random() * 2; /* 2-4 seconds */
+
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    particle.setAttribute("r", "3");
+    particle.setAttribute("class", "flow-particle");
+    particle.style.offsetPath = `path("${pathD}")`;
+    particle.style.setProperty("--particle-duration", `${duration}s`);
+    particle.style.setProperty("--particle-delay", `${(i / particleCount) * duration}s`);
+    particles.push(particle);
+  }
+
+  return particles;
+}
+
 function drawFlows(flows, regions, pulseCount, netValues) {
   drawBaseMap(FLOW_MAP, regions, "net", netValues, 780);
 
@@ -1237,6 +1261,12 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     path.style.setProperty("--pulse-width", `${widthScale}px`);
     if (index < pulseCount) {
       path.classList.add("flow-line--pulse");
+      /* Add animated particles for top flows */
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!prefersReducedMotion) {
+        const particleAnimation = createFlowParticles(pathD, index, 2);
+        particleAnimation.forEach((particle) => flowGroup.appendChild(particle));
+      }
     }
     path.style.setProperty("--flow-speed", "0s");
     flowGroup.appendChild(path);
