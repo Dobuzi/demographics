@@ -299,6 +299,51 @@ function initZoomPan() {
   }
 }
 
+/* ─── Theme Toggle ─── */
+
+function getSystemTheme() {
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+  return "dark";
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const themeIcon = document.getElementById("theme-icon");
+  if (themeIcon) {
+    themeIcon.textContent = theme === "light" ? "light_mode" : "dark_mode";
+  }
+  localStorage.setItem("demographics-theme", theme);
+  console.log("[theme] set", theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "light" ? "dark" : "light";
+  setTheme(next);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("demographics-theme");
+  const theme = saved || getSystemTheme();
+  setTheme(theme);
+
+  const themeToggle = document.getElementById("theme-toggle");
+  if (themeToggle) {
+    themeToggle.addEventListener("click", toggleTheme);
+  }
+
+  /* Listen for system theme changes */
+  if (typeof window.matchMedia === "function") {
+    window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", (e) => {
+      if (!localStorage.getItem("demographics-theme")) {
+        setTheme(e.matches ? "light" : "dark");
+      }
+    });
+  }
+}
+
 /* ─── Playback ─── */
 
 function getPlaybackInterval(period) {
@@ -1319,6 +1364,7 @@ function init() {
   toggleAgeAll();
   initSettingsToggle();
   initZoomPan();
+  initTheme();
   SEX_SELECT.value = "0";
   ITEM_SELECT.value = "T80";
   YEAR_LABEL.textContent = YEAR_RANGE.value;
