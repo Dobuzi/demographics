@@ -620,6 +620,10 @@ select {
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
 }
 
+#flow-lines {
+  transition: opacity 0.15s ease-out;
+}
+
 #flow-lines.is-muted .flow-line {
   opacity: 0.2;
 }

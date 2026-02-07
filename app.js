@@ -617,6 +617,31 @@ function scheduleRender(callback) {
   }
 }
 
+/**
+ * Fade out existing flow lines with CSS transition
+ * @param {number} [duration=200] - Fade duration in ms
+ * @returns {Promise} Resolves when fade completes
+ */
+function fadeOutFlows(duration = 200) {
+  const flowLines = document.getElementById("flow-lines");
+  if (!flowLines) return Promise.resolve();
+  flowLines.style.opacity = "0";
+  return new Promise((resolve) => setTimeout(resolve, duration));
+}
+
+/**
+ * Animate transition of flows by fading
+ * @param {function} renderCallback - Function to render new flows
+ */
+async function animateTransition(renderCallback) {
+  await fadeOutFlows(150);
+  renderCallback();
+  const flowLines = document.getElementById("flow-lines");
+  if (flowLines) {
+    flowLines.style.opacity = "1";
+  }
+}
+
 function drawBaseMap(svg, regions, mode, netValues, height) {
   const width = 900;
 
