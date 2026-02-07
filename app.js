@@ -296,6 +296,66 @@ function initZoomPan() {
         zoomOut();
       }
     }, { passive: false });
+
+    /* Touch gesture handling for mobile */
+    let touchStartDistance = 0;
+    let touchStartZoom = 1;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    const SWIPE_THRESHOLD = 50;
+
+    function getTouchDistance(touches) {
+      if (touches.length < 2) return 0;
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function handleSwipe(deltaX, deltaY) {
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+        const year = Number(YEAR_RANGE.value);
+        if (deltaX > 0 && year > Number(YEAR_RANGE.min)) {
+          YEAR_RANGE.value = String(year - 1);
+          YEAR_LABEL.textContent = YEAR_RANGE.value;
+          refresh();
+          console.log("[swipe] previous year", year - 1);
+        } else if (deltaX < 0 && year < Number(YEAR_RANGE.max)) {
+          YEAR_RANGE.value = String(year + 1);
+          YEAR_LABEL.textContent = YEAR_RANGE.value;
+          refresh();
+          console.log("[swipe] next year", year + 1);
+        }
+      }
+    }
+
+    FLOW_MAP.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        touchStartDistance = getTouchDistance(e.touches);
+        touchStartZoom = zoomLevel;
+      } else if (e.touches.length === 1) {
+        swipeStartX = e.touches[0].clientX;
+        swipeStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    FLOW_MAP.addEventListener("touchmove", (e) => {
+      if (e.touches.length === 2 && touchStartDistance > 0) {
+        e.preventDefault();
+        const currentDistance = getTouchDistance(e.touches);
+        const scale = currentDistance / touchStartDistance;
+        zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, touchStartZoom * scale));
+        updateViewBox();
+      }
+    }, { passive: false });
+
+    FLOW_MAP.addEventListener("touchend", (e) => {
+      if (e.changedTouches.length === 1 && touchStartDistance === 0) {
+        const deltaX = e.changedTouches[0].clientX - swipeStartX;
+        const deltaY = e.changedTouches[0].clientY - swipeStartY;
+        handleSwipe(deltaX, deltaY);
+      }
+      touchStartDistance = 0;
+    }, { passive: true });
   }
 }
 
