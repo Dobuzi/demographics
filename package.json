@@ -1,0 +1,15 @@
+{
+  "name": "demographics",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Korea internal migration flow visualization",
+  "scripts": {
+    "test": "for f in tests/*.test.js; do node \"$f\"; done",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

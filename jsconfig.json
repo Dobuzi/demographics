@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "checkJs": true,
+    "strict": false,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "region_mapping": ["./geo/region_mapping.js"],
+      "flow_style": ["./geo/flow_style.js"],
+      "geo_utils": ["./geo/geo_utils.js"],
+      "data_utils": ["./geo/data_utils.js"],
+      "data_processing": ["./geo/data_processing.js"]
+    },
+    "typeRoots": ["./types"]
+  },
+  "include": [
+    "*.js",
+    "geo/*.js",
+    "types/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "tests",
+    "e2e",
+    "scripts"
+  ]
+}

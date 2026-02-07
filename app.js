@@ -90,6 +90,9 @@ const {
   geometryCentroid: _geometryCentroid,
 } = window.geoUtils || {};
 
+/* Canvas renderer for high-performance flow visualization (optional) */
+const canvasRenderer = window.canvasRenderer || null;
+
 /* ─── State ─── */
 const cache = new Map();
 const cacheOrder = [];
@@ -103,6 +106,12 @@ let playState = {
   timer: null,
   loopId: 0,
 };
+let keyboardFlowState = {
+  selectedIndex: -1,
+  flowElements: [],
+};
+let previousYear = null;
+let lastNavigationDirection = 1; /* 1 = forward, -1 = backward */
 
 /* ─── Cache ─── */
 
@@ -295,9 +304,24 @@ function initSettingsToggle() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    if (SETTINGS_PANEL.classList.contains("is-collapsed")) return;
-    closeSettings();
+    if (event.key === "Escape") {
+      if (!SETTINGS_PANEL.classList.contains("is-collapsed")) {
+        closeSettings();
+        return;
+      }
+      if (window.clearFlowKeyboardSelection) {
+        window.clearFlowKeyboardSelection();
+      }
+      return;
+    }
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const delta = event.key === "ArrowUp" ? -1 : 1;
+      const nextIndex = keyboardFlowState.selectedIndex + delta;
+      if (window.selectFlowByKeyboard) {
+        window.selectFlowByKeyboard(nextIndex < 0 ? 0 : nextIndex);
+      }
+    }
   });
 }
 
@@ -580,15 +604,30 @@ function buildNet(data, options, regionIndex) {
 
 /* ─── SVG Rendering ─── */
 
+/**
+ * Schedule a callback to run on the next animation frame.
+ * Batches DOM updates to avoid layout thrashing.
+ * @param {function} callback
+ */
+function scheduleRender(callback) {
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(callback);
+  } else {
+    callback();
+  }
+}
+
 function drawBaseMap(svg, regions, mode, netValues, height) {
   const width = 900;
-  svg.innerHTML = "";
+
+  /* Use DocumentFragment to batch DOM operations */
+  const fragment = document.createDocumentFragment();
 
   const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
   background.setAttribute("width", width);
   background.setAttribute("height", height);
   background.setAttribute("fill", "#101218");
-  svg.appendChild(background);
+  fragment.appendChild(background);
 
   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
   const inboundGradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
@@ -611,14 +650,12 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
     '<stop offset="100%" stop-color="rgba(240, 91, 76, 0.2)"/>';
   defs.appendChild(inboundGradient);
   defs.appendChild(outboundGradient);
-  svg.appendChild(defs);
+  fragment.appendChild(defs);
 
   const values = Array.from(netValues.values());
   const maxAbs = Math.max(...values.map((value) => Math.abs(value)), 1);
   const polygonGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
   polygonGroup.setAttribute("id", "region-polygons");
-  const netFillInbound = FLOW_COLORS ? FLOW_COLORS.inbound : "#27d17f";
-  const netFillOutbound = FLOW_COLORS ? FLOW_COLORS.outbound : "#f05b4c";
 
   regions.forEach((region) => {
     const polygon = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -640,8 +677,7 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
     polygon.setAttribute("fill", fill);
     polygonGroup.appendChild(polygon);
   });
-
-  svg.appendChild(polygonGroup);
+  fragment.appendChild(polygonGroup);
 
   const dotGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
   dotGroup.setAttribute("id", "region-dots");
@@ -663,7 +699,13 @@ function drawBaseMap(svg, regions, mode, netValues, height) {
     label.textContent = region.name.replace("특별자치", "").replace("광역시", "").replace("특별시", "");
     dotGroup.appendChild(label);
   });
-  svg.appendChild(dotGroup);
+  fragment.appendChild(dotGroup);
+
+  /* Single DOM write: clear and append all at once */
+  scheduleRender(() => {
+    svg.innerHTML = "";
+    svg.appendChild(fragment);
+  });
 }
 
 /**
@@ -712,6 +754,53 @@ function drawFlows(flows, regions, pulseCount, netValues) {
       inbound.className = `region-shape ${getRegionHighlightClass ? getRegionHighlightClass("inbound") : "region-highlight inbound"}`;
     }
   };
+
+  /* ─── Keyboard Flow Selection ─── */
+  const selectFlowByKeyboard = (index) => {
+    if (playState.isPlaying) return;
+    const flowLines = flowGroup.querySelectorAll(".flow-line");
+    if (flowLines.length === 0) return;
+    const clampedIndex = ((index % flowLines.length) + flowLines.length) % flowLines.length;
+    clearFlowKeyboardSelection();
+    keyboardFlowState.selectedIndex = clampedIndex;
+    keyboardFlowState.flowElements = Array.from(flowLines);
+    const target = flowLines[clampedIndex];
+    if (!target) return;
+    const flowId = target.dataset.flowId;
+    flowGroup.classList.add("is-muted");
+    flowGroup.querySelectorAll(`[data-flow-id="${flowId}"]`).forEach((node) =>
+      node.classList.add("is-highlight", "is-keyboard-selected")
+    );
+    highlightRegions(target.dataset.fromCode, target.dataset.toCode);
+    if (FLOW_TOOLTIP) {
+      const meta = {
+        from: target.dataset.from,
+        to: target.dataset.to,
+        value: target.dataset.value,
+      };
+      const label = formatFlowLabel
+        ? formatFlowLabel(meta.from, meta.to, Number(meta.value))
+        : `${meta.from} → ${meta.to} · ${formatNumber(Number(meta.value))}명`;
+      FLOW_TOOLTIP.textContent = label;
+      FLOW_TOOLTIP.classList.add("is-active");
+      FLOW_TOOLTIP.style.transform = "translate(50%, 50%)";
+    }
+    console.log("[keyboard] selected flow", clampedIndex, target.dataset.label);
+  };
+  const clearFlowKeyboardSelection = () => {
+    flowGroup.querySelectorAll(".is-keyboard-selected").forEach((node) => {
+      node.classList.remove("is-highlight", "is-keyboard-selected");
+    });
+    flowGroup.classList.remove("is-muted");
+    clearRegionHighlights();
+    if (FLOW_TOOLTIP) {
+      FLOW_TOOLTIP.classList.remove("is-active");
+    }
+    keyboardFlowState.selectedIndex = -1;
+  };
+  window.selectFlowByKeyboard = selectFlowByKeyboard;
+  window.clearFlowKeyboardSelection = clearFlowKeyboardSelection;
+
   flows.forEach((flow, index) => {
     const source = flow.from.centroid;
     const target = flow.to.centroid;
@@ -921,6 +1010,13 @@ async function refresh() {
   const year = Number(YEAR_RANGE.value);
   const isMonthly = year === 2025;
   const month = isMonthly ? DEFAULT_MONTH : null;
+
+  /* Detect navigation direction for directional prefetch */
+  if (previousYear !== null && year !== previousYear) {
+    lastNavigationDirection = year > previousYear ? 1 : -1;
+    console.log("[refresh] direction", lastNavigationDirection > 0 ? "forward" : "backward");
+  }
+  previousYear = year;
   const ageIndex = getAgeIndex ? getAgeIndex(AGE_RANGE.value) : 0;
   const useAllAge = false;
   const options = {
@@ -952,6 +1048,24 @@ async function refresh() {
     updateTopList(flows);
     syncLabels(year, options.age, total, month, "총 이동 규모");
     renderNetLegend();
+
+    /* Directional prefetch: prefetch next period based on navigation direction */
+    if (!playState.isPlaying) {
+      const timeline = buildTimeline ? buildTimeline() : [];
+      const currentIndex = timeline.findIndex(
+        (entry) => entry.year === year && entry.month === month
+      );
+      if (currentIndex >= 0) {
+        const prefetchCount = getPrefetchCount();
+        for (let offset = 1; offset <= prefetchCount; offset += 1) {
+          const targetIndex = currentIndex + offset * lastNavigationDirection;
+          if (targetIndex >= 0 && targetIndex < timeline.length) {
+            prefetchPeriod(timeline[targetIndex]);
+          }
+        }
+        console.log("[refresh] directional prefetch", lastNavigationDirection > 0 ? "forward" : "backward");
+      }
+    }
   } catch (error) {
     if (error.name === "AbortError") {
       console.log("[refresh] aborted");
@@ -1061,7 +1175,17 @@ function init() {
     PLAY_TOGGLE.innerHTML = '<span class="material-symbols-rounded">play_arrow</span>';
   }
   bindControls();
-  refresh();
+
+  /* Defer initial data load to after first paint for better FCP */
+  const deferredRefresh = () => {
+    console.log("[init] deferred refresh start");
+    refresh();
+  };
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(deferredRefresh, { timeout: 1000 });
+  } else {
+    setTimeout(deferredRefresh, 0);
+  }
 }
 
 init();

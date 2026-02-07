@@ -6,11 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>인구의 이동</title>
     <link rel="icon" href="data:," />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#14161a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.svg" />
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,500,1,0"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="preload" href="assets/geo/korea_sido.geojson" as="fetch" crossorigin />
+    <link rel="preload" href="assets/geo/sido_office_centers.json" as="fetch" crossorigin />
     <script>
       window.KOSIS_USE_MERGED = true;
       window.KOSIS_DATA_BASE_URL =
@@ -137,6 +144,13 @@
                 </label>
               </div>
               <div class="panel__footer">
+                <label class="field field-lang">
+                  Language
+                  <select id="lang-switch" aria-label="Language">
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
               </div>
             </section>
           </div>
@@ -158,6 +172,8 @@
     <script src="geo/geo_utils.js"></script>
     <script src="geo/data_utils.js"></script>
     <script src="geo/data_processing.js"></script>
+    <script src="geo/i18n.js"></script>
+    <script src="geo/canvas_renderer.js"></script>
     <script src="app.js"></script>
     <script>
       if ("serviceWorker" in navigator) {
