@@ -263,6 +263,47 @@ function initFlowModal() {
   });
 }
 
+/* ─── Minimap ─── */
+
+function updateMinimapViewport() {
+  const viewport = document.getElementById("minimap-viewport");
+  const minimap = document.getElementById("minimap");
+  if (!viewport || !minimap) return;
+
+  const minimapRect = minimap.getBoundingClientRect();
+  const scale = minimapRect.width / BASE_VIEWBOX.w;
+
+  const viewW = (BASE_VIEWBOX.w / zoomLevel) * scale;
+  const viewH = (BASE_VIEWBOX.h / zoomLevel) * scale;
+  const viewX = ((BASE_VIEWBOX.w - BASE_VIEWBOX.w / zoomLevel) / 2 - panOffset.x) * scale;
+  const viewY = ((BASE_VIEWBOX.h - BASE_VIEWBOX.h / zoomLevel) / 2 - panOffset.y) * scale;
+
+  viewport.style.width = `${viewW}px`;
+  viewport.style.height = `${viewH}px`;
+  viewport.style.left = `${4 + viewX}px`;
+  viewport.style.top = `${4 + viewY}px`;
+}
+
+function initMinimap() {
+  const minimap = document.getElementById("minimap");
+  const minimapSvg = document.getElementById("minimap-svg");
+  if (!minimap || !minimapSvg) return;
+
+  /* Click on minimap to pan to that location */
+  minimap.addEventListener("click", (e) => {
+    const rect = minimap.getBoundingClientRect();
+    const x = (e.clientX - rect.left - 4) / rect.width * BASE_VIEWBOX.w;
+    const y = (e.clientY - rect.top - 4) / rect.height * BASE_VIEWBOX.h;
+    panOffset.x = x - BASE_VIEWBOX.w / 2;
+    panOffset.y = y - BASE_VIEWBOX.h / 2;
+    updateViewBox();
+    updateMinimapViewport();
+  });
+
+  updateMinimapViewport();
+  console.log("[minimap] initialized");
+}
+
 /* ─── Zoom & Pan ─── */
 
 function updateViewBox() {
@@ -272,6 +313,7 @@ function updateViewBox() {
   const x = BASE_VIEWBOX.x + (BASE_VIEWBOX.w - w) / 2 - panOffset.x;
   const y = BASE_VIEWBOX.y + (BASE_VIEWBOX.h - h) / 2 - panOffset.y;
   FLOW_MAP.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+  updateMinimapViewport();
 }
 
 function zoomIn() {
@@ -1477,6 +1519,7 @@ function init() {
   initZoomPan();
   initTheme();
   initFlowModal();
+  initMinimap();
   SEX_SELECT.value = "0";
   ITEM_SELECT.value = "T80";
   YEAR_LABEL.textContent = YEAR_RANGE.value;
