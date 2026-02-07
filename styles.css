@@ -590,6 +590,49 @@ select {
 #flow-map {
   width: 100%;
   height: 100%;
+  cursor: grab;
+}
+
+#flow-map:active {
+  cursor: grabbing;
+}
+
+.zoom-controls {
+  position: absolute;
+  bottom: 60px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  z-index: 10;
+}
+
+.zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.zoom-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.zoom-btn .material-symbols-rounded {
+  font-size: 20px;
 }
 
 .region-shape {

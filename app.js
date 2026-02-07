@@ -113,6 +113,16 @@ let keyboardFlowState = {
 let previousYear = null;
 let lastNavigationDirection = 1; /* 1 = forward, -1 = backward */
 
+/* ─── Zoom & Pan State ─── */
+let zoomLevel = 1;
+let panOffset = { x: 0, y: 0 };
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 0.25;
+const BASE_VIEWBOX = { x: -40, y: 0, w: 980, h: 780 };
+
 /* ─── Cache ─── */
 
 function setCacheEntry(key, data) {
@@ -171,6 +181,82 @@ function hideError() {
   if (FLOW_OVERLAY) {
     FLOW_OVERLAY.classList.remove("is-active");
     FLOW_OVERLAY.textContent = "";
+  }
+}
+
+/* ─── Zoom & Pan ─── */
+
+function updateViewBox() {
+  if (!FLOW_MAP) return;
+  const w = BASE_VIEWBOX.w / zoomLevel;
+  const h = BASE_VIEWBOX.h / zoomLevel;
+  const x = BASE_VIEWBOX.x + (BASE_VIEWBOX.w - w) / 2 - panOffset.x;
+  const y = BASE_VIEWBOX.y + (BASE_VIEWBOX.h - h) / 2 - panOffset.y;
+  FLOW_MAP.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+}
+
+function zoomIn() {
+  zoomLevel = Math.min(ZOOM_MAX, zoomLevel + ZOOM_STEP);
+  updateViewBox();
+  console.log("[zoom] in", zoomLevel);
+}
+
+function zoomOut() {
+  zoomLevel = Math.max(ZOOM_MIN, zoomLevel - ZOOM_STEP);
+  updateViewBox();
+  console.log("[zoom] out", zoomLevel);
+}
+
+function zoomReset() {
+  zoomLevel = 1;
+  panOffset = { x: 0, y: 0 };
+  updateViewBox();
+  console.log("[zoom] reset");
+}
+
+function handlePan(event) {
+  if (!isDragging) return;
+  const dx = (event.clientX - dragStart.x) / zoomLevel;
+  const dy = (event.clientY - dragStart.y) / zoomLevel;
+  panOffset.x += dx;
+  panOffset.y += dy;
+  dragStart = { x: event.clientX, y: event.clientY };
+  updateViewBox();
+}
+
+function initZoomPan() {
+  const zoomInBtn = document.getElementById("zoom-in");
+  const zoomOutBtn = document.getElementById("zoom-out");
+  const zoomResetBtn = document.getElementById("zoom-reset");
+
+  if (zoomInBtn) zoomInBtn.addEventListener("click", zoomIn);
+  if (zoomOutBtn) zoomOutBtn.addEventListener("click", zoomOut);
+  if (zoomResetBtn) zoomResetBtn.addEventListener("click", zoomReset);
+
+  if (FLOW_MAP) {
+    FLOW_MAP.addEventListener("mousedown", (e) => {
+      if (e.target.closest(".flow-line")) return;
+      isDragging = true;
+      dragStart = { x: e.clientX, y: e.clientY };
+      FLOW_MAP.style.cursor = "grabbing";
+    });
+    FLOW_MAP.addEventListener("mousemove", handlePan);
+    FLOW_MAP.addEventListener("mouseup", () => {
+      isDragging = false;
+      FLOW_MAP.style.cursor = "";
+    });
+    FLOW_MAP.addEventListener("mouseleave", () => {
+      isDragging = false;
+      FLOW_MAP.style.cursor = "";
+    });
+    FLOW_MAP.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomIn();
+      } else {
+        zoomOut();
+      }
+    }, { passive: false });
   }
 }
 
@@ -1193,6 +1279,7 @@ function init() {
   syncAgeLabel(safeIndex);
   toggleAgeAll();
   initSettingsToggle();
+  initZoomPan();
   SEX_SELECT.value = "0";
   ITEM_SELECT.value = "T80";
   YEAR_LABEL.textContent = YEAR_RANGE.value;
