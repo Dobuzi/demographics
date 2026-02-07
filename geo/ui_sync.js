@@ -363,6 +363,7 @@
     if (flowStyle && flowStyle.isFlowMetaValid) {
       return flowStyle.isFlowMetaValid(meta);
     }
+    if (!meta) return false;
     return meta.from && meta.to && meta.value;
   }
 
