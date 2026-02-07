@@ -4,7 +4,36 @@
   } else {
     root.flowStyle = factory();
   }
-})(this, function () {
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  /* ─── i18n helper (falls back to Korean) ─── */
+  function t(key, params) {
+    const i18n = typeof window !== "undefined" ? window.i18n : null;
+    if (i18n && typeof i18n.t === "function") {
+      return i18n.t(key, params);
+    }
+    /* Fallback Korean strings */
+    const fallbacks = {
+      persons: "명",
+      inflow: "유입",
+      outflow: "유출",
+      netMigrantTitle: "순이동자수",
+      netMigrantDesc: "전입자수에서 전출자수를 뺀 값입니다. 양수면 순유입, 음수면 순유출을 의미합니다.",
+      totalMigrantTitle: "이동자수",
+      totalMigrantDesc: "행정구역 간 이동한 총 인원입니다. 전입과 전출 흐름의 규모를 나타냅니다.",
+      modeTitleNet: "인구의 유입과 유출",
+      modeTitleDefault: "인구 이동",
+    };
+    let text = fallbacks[key] || key;
+    if (params) {
+      Object.keys(params).forEach((param) => {
+        text = text.replace(new RegExp(`\\{${param}\\}`, "g"), params[param]);
+      });
+    }
+    return text;
+  }
+
   /**
    * Build SVG gradient stop definitions for a flow line.
    * @param {string} fromColor - CSS color for the start (outbound) end.
@@ -79,7 +108,7 @@
    */
   function formatFlowLabel(fromName, toName, value) {
     const formatter = new Intl.NumberFormat("ko-KR");
-    return `${fromName} → ${toName} · ${formatter.format(value)}명`;
+    return `${fromName} → ${toName} · ${formatter.format(value)}${t("persons")}`;
   }
 
   /**
@@ -133,28 +162,26 @@
   function getIndicatorInfo(code) {
     if (code === "T80") {
       return {
-        title: "순이동자수",
-        description:
-          "전입자수에서 전출자수를 뺀 값입니다. 양수면 순유입, 음수면 순유출을 의미합니다.",
+        title: t("netMigrantTitle"),
+        description: t("netMigrantDesc"),
       };
     }
     return {
-      title: "이동자수",
-      description:
-        "행정구역 간 이동한 총 인원입니다. 전입과 전출 흐름의 규모를 나타냅니다.",
+      title: t("totalMigrantTitle"),
+      description: t("totalMigrantDesc"),
     };
   }
 
   /**
    * Get the display title for a visualization mode.
    * @param {string} mode - "net" or other mode identifier.
-   * @returns {string} Korean title string.
+   * @returns {string} Localized title string.
    */
   function getModeTitle(mode) {
     if (mode === "net") {
-      return "인구의 유입과 유출";
+      return t("modeTitleNet");
     }
-    return "인구 이동";
+    return t("modeTitleDefault");
   }
 
   /**
@@ -179,8 +206,8 @@
    */
   function getNetLegendItems() {
     return [
-      { label: "유입", color: FLOW_COLORS.inbound },
-      { label: "유출", color: FLOW_COLORS.outbound },
+      { label: t("inflow"), color: FLOW_COLORS.inbound },
+      { label: t("outflow"), color: FLOW_COLORS.outbound },
     ];
   }
 
