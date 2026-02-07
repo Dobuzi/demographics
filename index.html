@@ -78,6 +78,21 @@
               ></svg>
               <div class="map-overlay" id="flow-overlay"></div>
               <div class="flow-tooltip" id="flow-tooltip" role="status"></div>
+              <div class="zoom-controls glass-panel" role="group" aria-label="지도 확대/축소">
+                <button type="button" class="zoom-btn" id="zoom-in" aria-label="확대">
+                  <span class="material-symbols-rounded">add</span>
+                </button>
+                <button type="button" class="zoom-btn" id="zoom-out" aria-label="축소">
+                  <span class="material-symbols-rounded">remove</span>
+                </button>
+                <button type="button" class="zoom-btn" id="zoom-reset" aria-label="원래 크기">
+                  <span class="material-symbols-rounded">fit_screen</span>
+                </button>
+              </div>
+              <div class="minimap glass-panel" id="minimap" aria-label="미니맵">
+                <svg id="minimap-svg" viewBox="-40 0 980 780" preserveAspectRatio="xMidYMid meet"></svg>
+                <div class="minimap__viewport" id="minimap-viewport"></div>
+              </div>
               <div class="error-banner" id="error-banner" role="alert" aria-live="assertive">
                 <span class="error-banner__message" id="error-message"></span>
                 <button type="button" class="error-banner__retry" id="error-retry" aria-label="다시 시도">다시 시도</button>
@@ -151,6 +166,13 @@
                     <option value="en">English</option>
                   </select>
                 </label>
+                <label class="field field-colorblind">
+                  <input type="checkbox" id="colorblind-toggle" aria-label="색맹 모드" />
+                  <span class="material-symbols-rounded">accessibility</span>
+                </label>
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="테마 전환">
+                  <span class="material-symbols-rounded" id="theme-icon">dark_mode</span>
+                </button>
               </div>
             </section>
           </div>
@@ -165,6 +187,24 @@
           </a>
         </p>
       </footer>
+    </div>
+
+    <!-- Flow Detail Modal -->
+    <div class="flow-modal" id="flow-modal" role="dialog" aria-labelledby="flow-modal-title" aria-hidden="true">
+      <div class="flow-modal__backdrop" id="flow-modal-backdrop"></div>
+      <div class="flow-modal__content glass-panel">
+        <header class="flow-modal__header">
+          <h2 id="flow-modal-title" class="flow-modal__title">이동 상세</h2>
+          <button type="button" class="flow-modal__close" id="flow-modal-close" aria-label="닫기">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </header>
+        <div class="flow-modal__body">
+          <div class="flow-modal__route" id="flow-modal-route"></div>
+          <div class="flow-modal__value" id="flow-modal-value"></div>
+          <div class="flow-modal__history" id="flow-modal-history"></div>
+        </div>
+      </div>
     </div>
 
     <script src="geo/region_mapping.js"></script>

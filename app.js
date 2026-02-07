@@ -113,6 +113,16 @@ let keyboardFlowState = {
 let previousYear = null;
 let lastNavigationDirection = 1; /* 1 = forward, -1 = backward */
 
+/* ─── Zoom & Pan State ─── */
+let zoomLevel = 1;
+let panOffset = { x: 0, y: 0 };
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 0.25;
+const BASE_VIEWBOX = { x: -40, y: 0, w: 980, h: 780 };
+
 /* ─── Cache ─── */
 
 function setCacheEntry(key, data) {
@@ -152,6 +162,45 @@ function setLoading(target, isLoading) {
   target.classList.toggle("is-active", isLoading);
 }
 
+function showSkeleton() {
+  if (!FLOW_MAP) return;
+  const skeleton = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  skeleton.setAttribute("id", "skeleton-loader");
+  skeleton.setAttribute("class", "skeleton");
+  /* Draw placeholder region shapes */
+  const placeholderPaths = [
+    "M450 200 L500 180 L550 200 L530 260 L470 260 Z",
+    "M380 300 L430 280 L480 320 L450 380 L390 350 Z",
+    "M520 350 L580 320 L620 370 L590 430 L530 400 Z",
+  ];
+  placeholderPaths.forEach((d) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "skeleton-region");
+    skeleton.appendChild(path);
+  });
+  /* Draw placeholder flow lines */
+  const flowPlaceholders = [
+    "M450 230 Q500 180 530 280",
+    "M400 320 Q480 250 550 370",
+  ];
+  flowPlaceholders.forEach((d) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "skeleton-flow");
+    path.setAttribute("fill", "none");
+    skeleton.appendChild(path);
+  });
+  FLOW_MAP.appendChild(skeleton);
+}
+
+function hideSkeleton() {
+  const skeleton = document.getElementById("skeleton-loader");
+  if (skeleton) {
+    skeleton.remove();
+  }
+}
+
 function showError(message) {
   if (ERROR_BANNER && ERROR_MESSAGE) {
     ERROR_MESSAGE.textContent = message;
@@ -172,6 +221,290 @@ function hideError() {
     FLOW_OVERLAY.classList.remove("is-active");
     FLOW_OVERLAY.textContent = "";
   }
+}
+
+/* ─── Flow Detail Modal ─── */
+
+function openFlowModal(flowData) {
+  const modal = document.getElementById("flow-modal");
+  const route = document.getElementById("flow-modal-route");
+  const value = document.getElementById("flow-modal-value");
+  const history = document.getElementById("flow-modal-history");
+
+  if (!modal || !flowData) return;
+
+  route.textContent = `${flowData.from} → ${flowData.to}`;
+  value.textContent = `${formatNumber(Number(flowData.value))}명`;
+  history.innerHTML = `<p>현재 연도: ${YEAR_RANGE.value}년</p><p>이 경로의 이동자 수입니다.</p>`;
+
+  modal.setAttribute("aria-hidden", "false");
+  console.log("[modal] open", flowData);
+}
+
+function closeFlowModal() {
+  const modal = document.getElementById("flow-modal");
+  if (modal) {
+    modal.setAttribute("aria-hidden", "true");
+  }
+}
+
+function initFlowModal() {
+  const modal = document.getElementById("flow-modal");
+  const backdrop = document.getElementById("flow-modal-backdrop");
+  const closeBtn = document.getElementById("flow-modal-close");
+
+  if (backdrop) backdrop.addEventListener("click", closeFlowModal);
+  if (closeBtn) closeBtn.addEventListener("click", closeFlowModal);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal && modal.getAttribute("aria-hidden") === "false") {
+      closeFlowModal();
+    }
+  });
+}
+
+/* ─── Minimap ─── */
+
+function updateMinimapViewport() {
+  const viewport = document.getElementById("minimap-viewport");
+  const minimap = document.getElementById("minimap");
+  if (!viewport || !minimap) return;
+
+  const minimapRect = minimap.getBoundingClientRect();
+  const scale = minimapRect.width / BASE_VIEWBOX.w;
+
+  const viewW = (BASE_VIEWBOX.w / zoomLevel) * scale;
+  const viewH = (BASE_VIEWBOX.h / zoomLevel) * scale;
+  const viewX = ((BASE_VIEWBOX.w - BASE_VIEWBOX.w / zoomLevel) / 2 - panOffset.x) * scale;
+  const viewY = ((BASE_VIEWBOX.h - BASE_VIEWBOX.h / zoomLevel) / 2 - panOffset.y) * scale;
+
+  viewport.style.width = `${viewW}px`;
+  viewport.style.height = `${viewH}px`;
+  viewport.style.left = `${4 + viewX}px`;
+  viewport.style.top = `${4 + viewY}px`;
+}
+
+function initMinimap() {
+  const minimap = document.getElementById("minimap");
+  const minimapSvg = document.getElementById("minimap-svg");
+  if (!minimap || !minimapSvg) return;
+
+  /* Click on minimap to pan to that location */
+  minimap.addEventListener("click", (e) => {
+    const rect = minimap.getBoundingClientRect();
+    const x = (e.clientX - rect.left - 4) / rect.width * BASE_VIEWBOX.w;
+    const y = (e.clientY - rect.top - 4) / rect.height * BASE_VIEWBOX.h;
+    panOffset.x = x - BASE_VIEWBOX.w / 2;
+    panOffset.y = y - BASE_VIEWBOX.h / 2;
+    updateViewBox();
+    updateMinimapViewport();
+  });
+
+  updateMinimapViewport();
+  console.log("[minimap] initialized");
+}
+
+/* ─── Zoom & Pan ─── */
+
+function updateViewBox() {
+  if (!FLOW_MAP) return;
+  const w = BASE_VIEWBOX.w / zoomLevel;
+  const h = BASE_VIEWBOX.h / zoomLevel;
+  const x = BASE_VIEWBOX.x + (BASE_VIEWBOX.w - w) / 2 - panOffset.x;
+  const y = BASE_VIEWBOX.y + (BASE_VIEWBOX.h - h) / 2 - panOffset.y;
+  FLOW_MAP.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+  updateMinimapViewport();
+}
+
+function zoomIn() {
+  zoomLevel = Math.min(ZOOM_MAX, zoomLevel + ZOOM_STEP);
+  updateViewBox();
+  console.log("[zoom] in", zoomLevel);
+}
+
+function zoomOut() {
+  zoomLevel = Math.max(ZOOM_MIN, zoomLevel - ZOOM_STEP);
+  updateViewBox();
+  console.log("[zoom] out", zoomLevel);
+}
+
+function zoomReset() {
+  zoomLevel = 1;
+  panOffset = { x: 0, y: 0 };
+  updateViewBox();
+  console.log("[zoom] reset");
+}
+
+function handlePan(event) {
+  if (!isDragging) return;
+  const dx = (event.clientX - dragStart.x) / zoomLevel;
+  const dy = (event.clientY - dragStart.y) / zoomLevel;
+  panOffset.x += dx;
+  panOffset.y += dy;
+  dragStart = { x: event.clientX, y: event.clientY };
+  updateViewBox();
+}
+
+function initZoomPan() {
+  const zoomInBtn = document.getElementById("zoom-in");
+  const zoomOutBtn = document.getElementById("zoom-out");
+  const zoomResetBtn = document.getElementById("zoom-reset");
+
+  if (zoomInBtn) zoomInBtn.addEventListener("click", zoomIn);
+  if (zoomOutBtn) zoomOutBtn.addEventListener("click", zoomOut);
+  if (zoomResetBtn) zoomResetBtn.addEventListener("click", zoomReset);
+
+  if (FLOW_MAP) {
+    FLOW_MAP.addEventListener("mousedown", (e) => {
+      if (e.target.closest(".flow-line")) return;
+      isDragging = true;
+      dragStart = { x: e.clientX, y: e.clientY };
+      FLOW_MAP.style.cursor = "grabbing";
+    });
+    FLOW_MAP.addEventListener("mousemove", handlePan);
+    FLOW_MAP.addEventListener("mouseup", () => {
+      isDragging = false;
+      FLOW_MAP.style.cursor = "";
+    });
+    FLOW_MAP.addEventListener("mouseleave", () => {
+      isDragging = false;
+      FLOW_MAP.style.cursor = "";
+    });
+    FLOW_MAP.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomIn();
+      } else {
+        zoomOut();
+      }
+    }, { passive: false });
+
+    /* Touch gesture handling for mobile */
+    let touchStartDistance = 0;
+    let touchStartZoom = 1;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    const SWIPE_THRESHOLD = 50;
+
+    function getTouchDistance(touches) {
+      if (touches.length < 2) return 0;
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function handleSwipe(deltaX, deltaY) {
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+        const year = Number(YEAR_RANGE.value);
+        if (deltaX > 0 && year > Number(YEAR_RANGE.min)) {
+          YEAR_RANGE.value = String(year - 1);
+          YEAR_LABEL.textContent = YEAR_RANGE.value;
+          refresh();
+          console.log("[swipe] previous year", year - 1);
+        } else if (deltaX < 0 && year < Number(YEAR_RANGE.max)) {
+          YEAR_RANGE.value = String(year + 1);
+          YEAR_LABEL.textContent = YEAR_RANGE.value;
+          refresh();
+          console.log("[swipe] next year", year + 1);
+        }
+      }
+    }
+
+    FLOW_MAP.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        touchStartDistance = getTouchDistance(e.touches);
+        touchStartZoom = zoomLevel;
+      } else if (e.touches.length === 1) {
+        swipeStartX = e.touches[0].clientX;
+        swipeStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    FLOW_MAP.addEventListener("touchmove", (e) => {
+      if (e.touches.length === 2 && touchStartDistance > 0) {
+        e.preventDefault();
+        const currentDistance = getTouchDistance(e.touches);
+        const scale = currentDistance / touchStartDistance;
+        zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, touchStartZoom * scale));
+        updateViewBox();
+      }
+    }, { passive: false });
+
+    FLOW_MAP.addEventListener("touchend", (e) => {
+      if (e.changedTouches.length === 1 && touchStartDistance === 0) {
+        const deltaX = e.changedTouches[0].clientX - swipeStartX;
+        const deltaY = e.changedTouches[0].clientY - swipeStartY;
+        handleSwipe(deltaX, deltaY);
+      }
+      touchStartDistance = 0;
+    }, { passive: true });
+  }
+}
+
+/* ─── Theme Toggle ─── */
+
+function getSystemTheme() {
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+  return "dark";
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const themeIcon = document.getElementById("theme-icon");
+  if (themeIcon) {
+    themeIcon.textContent = theme === "light" ? "light_mode" : "dark_mode";
+  }
+  localStorage.setItem("demographics-theme", theme);
+  console.log("[theme] set", theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "light" ? "dark" : "light";
+  setTheme(next);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("demographics-theme");
+  const theme = saved || getSystemTheme();
+  setTheme(theme);
+
+  const themeToggle = document.getElementById("theme-toggle");
+  if (themeToggle) {
+    themeToggle.addEventListener("click", toggleTheme);
+  }
+
+  /* Listen for system theme changes */
+  if (typeof window.matchMedia === "function") {
+    window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", (e) => {
+      if (!localStorage.getItem("demographics-theme")) {
+        setTheme(e.matches ? "light" : "dark");
+      }
+    });
+  }
+}
+
+/* ─── Color-blind Mode ─── */
+
+function setColorPalette(isColorblind) {
+  document.documentElement.setAttribute("data-colorblind", isColorblind ? "true" : "false");
+  localStorage.setItem("demographics-colorblind", isColorblind ? "true" : "false");
+  console.log("[colorblind] set", isColorblind);
+}
+
+function initColorblindToggle() {
+  const toggle = document.getElementById("colorblind-toggle");
+  if (!toggle) return;
+
+  const saved = localStorage.getItem("demographics-colorblind") === "true";
+  toggle.checked = saved;
+  setColorPalette(saved);
+
+  toggle.addEventListener("change", () => {
+    setColorPalette(toggle.checked);
+  });
 }
 
 /* ─── Playback ─── */
@@ -617,6 +950,31 @@ function scheduleRender(callback) {
   }
 }
 
+/**
+ * Fade out existing flow lines with CSS transition
+ * @param {number} [duration=200] - Fade duration in ms
+ * @returns {Promise} Resolves when fade completes
+ */
+function fadeOutFlows(duration = 200) {
+  const flowLines = document.getElementById("flow-lines");
+  if (!flowLines) return Promise.resolve();
+  flowLines.style.opacity = "0";
+  return new Promise((resolve) => setTimeout(resolve, duration));
+}
+
+/**
+ * Animate transition of flows by fading
+ * @param {function} renderCallback - Function to render new flows
+ */
+async function animateTransition(renderCallback) {
+  await fadeOutFlows(150);
+  renderCallback();
+  const flowLines = document.getElementById("flow-lines");
+  if (flowLines) {
+    flowLines.style.opacity = "1";
+  }
+}
+
 function drawBaseMap(svg, regions, mode, netValues, height) {
   const width = 900;
 
@@ -727,6 +1085,30 @@ function flowPath(source, target) {
   const controlX = midX + normX * curve;
   const controlY = midY + normY * curve;
   return `M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`;
+}
+
+/**
+ * Create animated particle elements for a flow path
+ * @param {string} pathD - SVG path d attribute
+ * @param {number} index - Flow index for unique IDs
+ * @param {number} particleCount - Number of particles to create
+ * @returns {Array} Array of SVG circle elements
+ */
+function createFlowParticles(pathD, index, particleCount = 3) {
+  const particles = [];
+  const duration = 2 + Math.random() * 2; /* 2-4 seconds */
+
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    particle.setAttribute("r", "3");
+    particle.setAttribute("class", "flow-particle");
+    particle.style.offsetPath = `path("${pathD}")`;
+    particle.style.setProperty("--particle-duration", `${duration}s`);
+    particle.style.setProperty("--particle-delay", `${(i / particleCount) * duration}s`);
+    particles.push(particle);
+  }
+
+  return particles;
 }
 
 function drawFlows(flows, regions, pulseCount, netValues) {
@@ -879,6 +1261,12 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     path.style.setProperty("--pulse-width", `${widthScale}px`);
     if (index < pulseCount) {
       path.classList.add("flow-line--pulse");
+      /* Add animated particles for top flows */
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!prefersReducedMotion) {
+        const particleAnimation = createFlowParticles(pathD, index, 2);
+        particleAnimation.forEach((particle) => flowGroup.appendChild(particle));
+      }
     }
     path.style.setProperty("--flow-speed", "0s");
     flowGroup.appendChild(path);
@@ -935,6 +1323,17 @@ function drawFlows(flows, regions, pulseCount, netValues) {
     const x = event.clientX - rect.left + 12;
     const y = event.clientY - rect.top + 12;
     FLOW_TOOLTIP.style.transform = `translate(${x}px, ${y}px)`;
+  }, true);
+
+  /* Click to open flow detail modal */
+  flowGroup.addEventListener("click", (event) => {
+    const target = event.target.closest(".flow-line");
+    if (!target || playState.isPlaying) return;
+    openFlowModal({
+      from: target.dataset.from,
+      to: target.dataset.to,
+      value: target.dataset.value,
+    });
   }, true);
 
   FLOW_MAP.appendChild(defs);
@@ -1168,6 +1567,11 @@ function init() {
   syncAgeLabel(safeIndex);
   toggleAgeAll();
   initSettingsToggle();
+  initZoomPan();
+  initTheme();
+  initFlowModal();
+  initMinimap();
+  initColorblindToggle();
   SEX_SELECT.value = "0";
   ITEM_SELECT.value = "T80";
   YEAR_LABEL.textContent = YEAR_RANGE.value;
