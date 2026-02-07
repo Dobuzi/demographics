@@ -162,6 +162,45 @@ function setLoading(target, isLoading) {
   target.classList.toggle("is-active", isLoading);
 }
 
+function showSkeleton() {
+  if (!FLOW_MAP) return;
+  const skeleton = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  skeleton.setAttribute("id", "skeleton-loader");
+  skeleton.setAttribute("class", "skeleton");
+  /* Draw placeholder region shapes */
+  const placeholderPaths = [
+    "M450 200 L500 180 L550 200 L530 260 L470 260 Z",
+    "M380 300 L430 280 L480 320 L450 380 L390 350 Z",
+    "M520 350 L580 320 L620 370 L590 430 L530 400 Z",
+  ];
+  placeholderPaths.forEach((d) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "skeleton-region");
+    skeleton.appendChild(path);
+  });
+  /* Draw placeholder flow lines */
+  const flowPlaceholders = [
+    "M450 230 Q500 180 530 280",
+    "M400 320 Q480 250 550 370",
+  ];
+  flowPlaceholders.forEach((d) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "skeleton-flow");
+    path.setAttribute("fill", "none");
+    skeleton.appendChild(path);
+  });
+  FLOW_MAP.appendChild(skeleton);
+}
+
+function hideSkeleton() {
+  const skeleton = document.getElementById("skeleton-loader");
+  if (skeleton) {
+    skeleton.remove();
+  }
+}
+
 function showError(message) {
   if (ERROR_BANNER && ERROR_MESSAGE) {
     ERROR_MESSAGE.textContent = message;
