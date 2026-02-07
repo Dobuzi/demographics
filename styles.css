@@ -636,7 +636,17 @@ select {
 }
 
 .region-shape {
-  transition: fill 0.6s ease, fill-opacity 0.6s ease, stroke 0.6s ease, opacity 0.6s ease;
+  transition: fill 0.6s ease, fill-opacity 0.6s ease, stroke 0.6s ease, opacity 0.6s ease, filter 0.2s ease;
+  cursor: pointer;
+}
+
+.region-shape:hover {
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6)) brightness(1.15);
+}
+
+.region-shape:focus {
+  outline: none;
+  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.8)) brightness(1.2);
 }
 
 .net-legend {
