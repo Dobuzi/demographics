@@ -207,13 +207,24 @@
       </div>
     </div>
 
+    <!-- Core modules (no dependencies) -->
+    <script src="geo/config.js"></script>
+    <script src="geo/state.js"></script>
+    <script src="geo/i18n.js"></script>
     <script src="geo/region_mapping.js"></script>
-    <script src="geo/flow_style.js"></script>
     <script src="geo/geo_utils.js"></script>
     <script src="geo/data_utils.js"></script>
+    <script src="geo/flow_style.js"></script>
     <script src="geo/data_processing.js"></script>
-    <script src="geo/i18n.js"></script>
+    <!-- Higher-level modules (depend on core) -->
+    <script src="geo/data_loader.js"></script>
+    <script src="geo/renderer.js"></script>
+    <script src="geo/ui_sync.js"></script>
+    <script src="geo/interaction.js"></script>
+    <script src="geo/playback.js"></script>
+    <!-- Optional modules -->
     <script src="geo/canvas_renderer.js"></script>
+    <!-- Main application -->
     <script src="app.js"></script>
     <script>
       if ("serviceWorker" in navigator) {
